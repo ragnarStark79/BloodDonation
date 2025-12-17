@@ -33,14 +33,19 @@ const NearbyRequests = () => {
     try {
       setLoading(true);
       const params = {
-        lat: coords.lat,
-        lng: coords.lng,
-        km: filters.km || 10,
+        // Temporarily disable location filtering until requests have proper coordinates
+        // lat: coords.lat,
+        // lng: coords.lng,
+        // km: filters.km || 10,
         urgency: filters.urgency !== "ALL" ? filters.urgency : undefined,
         group: filters.group || undefined,
       };
       const res = await client.get("/api/donor/requests/nearby", { params });
+      console.log('🔍 API Response:', res.data);
+      console.log('🔍 Requests from API:', res.data.requests);
+      console.log('🔍 Requests length:', res.data.requests?.length);
       setRequests(res.data.requests || []);
+      console.log('✅ Set requests to state');
       setEligibleInfo({ eligible: res.data.eligible, nextEligibleDate: res.data.nextEligibleDate });
     } catch (err) {
       console.error(err);
@@ -228,6 +233,9 @@ const NearbyRequests = () => {
           )}
         </div>
       )}
+
+      {/* Debug log */}
+      {console.log('🎨 Rendering, requests.length:', requests.length, 'requests:', requests)}
 
       {/* Details modal */}
       {selected && (

@@ -25,7 +25,10 @@ const requestSchema = new mongoose.Schema(
         enum: ["Point"],
         default: "Point"
       },
-      coordinates: { type: [Number], required: true }, // [lng, lat]
+      coordinates: {
+        type: [Number],
+        default: [77.2, 28.6] // Default to Delhi coordinates if not provided
+      },
       address: String,
       city: String,
       state: String
@@ -53,11 +56,11 @@ const requestSchema = new mongoose.Schema(
     }],
 
     // Contact information
-    contactPerson: { type: String, required: true },
-    contactPhone: { type: String, required: true },
+    contactPerson: String, // Temporarily optional for debugging
+    contactPhone: String, // Temporarily optional for debugging
 
     // Case details
-    caseDetails: { type: String, required: true },
+    caseDetails: String, // Temporarily optional for debugging
     patientAge: Number,
     patientGender: { type: String, enum: ["MALE", "FEMALE", "OTHER"] },
 
@@ -100,11 +103,10 @@ requestSchema.virtual("interestedDonorsCount").get(function () {
 });
 
 // Pre-save middleware to set createdBy from organizationId if not set
-requestSchema.pre("save", function (next) {
+requestSchema.pre("save", async function () {
   if (!this.createdBy && this.organizationId) {
     this.createdBy = this.organizationId;
   }
-  next();
 });
 
 export default mongoose.model("Request", requestSchema);

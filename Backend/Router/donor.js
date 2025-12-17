@@ -15,10 +15,6 @@ router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
     const { lat, lng, km = 10, group, urgency } = req.query;
     console.log(`[DonorAPI] /requests/nearby params: lat=${lat} lng=${lng} km=${km} group=${group}`);
 
-    if (!lat || !lng) {
-      return res.status(400).json({ message: "lat and lng are required" });
-    }
-
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -37,21 +33,35 @@ router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
     const bloodGroup = group || user.bloodGroup || user.Bloodgroup; // Fallback to user group
     console.log(`[DonorAPI] Searching for bloodGroup: ${bloodGroup}`);
 
+    // Build base query
     const query = {
       status: REQUEST_STATUS.OPEN,
       bloodGroup, // Match user's blood group
-      locationGeo: {
-        $near: {
-          $geometry: { type: "Point", coordinates: [Number(lng), Number(lat)] },
-          $maxDistance: Number(km) * 1000,
-        },
-      },
     };
 
     if (urgency) query.urgency = urgency;
 
-    const requests = await Request.find(query).limit(50).lean();
-    console.log(`[DonorAPI] Found ${requests.length} requests`);
+    let requests;
+
+    // If lat/lng provided, do geospatial search
+    if (lat && lng) {
+      query.locationGeo = {
+        $near: {
+          $geometry: { type: "Point", coordinates: [Number(lng), Number(lat)] },
+          $maxDistance: Number(km) * 1000,
+        },
+      };
+      requests = await Request.find(query).limit(50).lean();
+      console.log(`[DonorAPI] Found ${requests.length} requests with geolocation`);
+    } else {
+      // Otherwise just return by blood group (no distance filtering)
+      console.log(`[DonorAPI] No location provided, returning all matching blood group requests`);
+      requests = await Request.find(query)
+        .sort({ urgency: -1, createdAt: -1 })
+        .limit(50)
+        .lean();
+      console.log(`[DonorAPI] Found ${requests.length} requests by blood group only`);
+    }
 
     res.json({
       eligible: true,

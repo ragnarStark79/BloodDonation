@@ -156,6 +156,7 @@ export const isRequestUrgent = (urgency) => [REQUEST_URGENCY.CRITICAL, REQUEST_U
 export const isRequestActive = (status) => [REQUEST_STATUS.OPEN, REQUEST_STATUS.ASSIGNED].includes(status);
 
 export const formatDistance = (distanceKm) => {
+    if (!distanceKm && distanceKm !== 0) return 'N/A'; // Handle undefined/null
     if (distanceKm < 1) return `${Math.round(distanceKm * 1000)}m`;
     return `${distanceKm.toFixed(1)}km`;
 };
