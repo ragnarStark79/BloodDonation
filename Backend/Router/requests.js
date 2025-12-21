@@ -618,7 +618,7 @@ router.get("/org/incoming", orgAuth, async (req, res) => {
 
         // Build query for open requests
         const query = {
-            status: { $in: [REQUEST_STATUS.OPEN, REQUEST_STATUS.ASSIGNED] },
+            status: REQUEST_STATUS.OPEN,  // Only show OPEN requests, not ASSIGNED
             organizationId: { $ne: req.user.userId } // Exclude own requests
         };
 

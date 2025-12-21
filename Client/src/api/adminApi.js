@@ -304,6 +304,31 @@ export const adminApi = {
         const res = await client.put(`/api/admin/donations/${id}/lab-tests`, labTestData);
         return res.data;
     },
+
+    /**
+     * Check if donation exists for appointment
+     */
+    checkDonationByAppointment: async (appointmentId) => {
+        try {
+            const res = await client.get("/api/admin/donations");
+            const allDonations = res.data;
+
+            // Search through all stages for donation with matching appointmentId
+            for (const stage of Object.values(allDonations)) {
+                if (stage.items) {
+                    const found = stage.items.find(item => item.appointmentId === appointmentId);
+                    if (found) {
+                        return { exists: true, donation: found };
+                    }
+                }
+            }
+
+            return { exists: false, donation: null };
+        } catch (error) {
+            console.error("Error checking donation by appointment:", error);
+            return { exists: false, donation: null };
+        }
+    },
 };
 
 export default adminApi;

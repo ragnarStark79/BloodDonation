@@ -123,6 +123,26 @@ const OrgOverview = () => {
         fetchDashboard();
         fetchDonationStats();
         fetchChartData();
+
+        // Auto-refresh every 30 seconds
+        const interval = setInterval(() => {
+            fetchDashboard();
+            fetchDonationStats();
+        }, 30000); // 30 seconds
+
+        // Refresh when user returns to tab
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                fetchDashboard();
+                fetchDonationStats();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, []);
 
     const fetchDashboard = async () => {
@@ -304,11 +324,11 @@ const OrgOverview = () => {
                         {/* Compact 5-stage preview */}
                         <div className="grid grid-cols-5 gap-4">
                             {[
-                                { title: 'New Donors', color: 'from-red-50 to-red-100/50', ring: 'ring-red-100', text: 'text-red-600', count: 0 },
-                                { title: 'Screening', color: 'from-blue-50 to-blue-100/50', ring: 'ring-blue-100', text: 'text-blue-600', count: 0 },
-                                { title: 'In Progress', color: 'from-yellow-50 to-yellow-100/50', ring: 'ring-yellow-100', text: 'text-yellow-600', count: 0 },
-                                { title: 'Completed', color: 'from-green-50 to-green-100/50', ring: 'ring-green-100', text: 'text-green-600', count: 0 },
-                                { title: 'Ready for Storage', color: 'from-purple-50 to-purple-100/50', ring: 'ring-purple-100', text: 'text-purple-600', count: 0 }
+                                { title: 'New Donors', color: 'from-red-50 to-red-100/50', ring: 'ring-red-100', text: 'text-red-600', count: donationStats?.byStage?.['new-donors'] || 0 },
+                                { title: 'Screening', color: 'from-blue-50 to-blue-100/50', ring: 'ring-blue-100', text: 'text-blue-600', count: donationStats?.byStage?.['screening'] || 0 },
+                                { title: 'In Progress', color: 'from-yellow-50 to-yellow-100/50', ring: 'ring-yellow-100', text: 'text-yellow-600', count: donationStats?.byStage?.['in-progress'] || 0 },
+                                { title: 'Completed', color: 'from-green-50 to-green-100/50', ring: 'ring-green-100', text: 'text-green-600', count: donationStats?.byStage?.['completed'] || 0 },
+                                { title: 'Ready for Storage', color: 'from-purple-50 to-purple-100/50', ring: 'ring-purple-100', text: 'text-purple-600', count: donationStats?.byStage?.['ready-storage'] || 0 }
                             ].map((stage, index) => (
                                 <div
                                     key={index}

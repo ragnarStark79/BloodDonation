@@ -381,24 +381,36 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
                                                             </p>
                                                         </div>
 
-                                                        {/* Action */}
-                                                        <button
-                                                            onClick={() => handleAssignBloodBank(bank._id)}
-                                                            disabled={assigning === bank._id}
-                                                            className="w-full px-4 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                                        >
-                                                            {assigning === bank._id ? (
-                                                                <>
-                                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                                    Requesting...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <CheckCircle className="w-4 h-4" />
-                                                                    Request Units from Blood Bank
-                                                                </>
-                                                            )}
-                                                        </button>
+                                                        {/* Action - Check if this blood bank is already assigned */}
+                                                        {request.assignedTo?.organizationId?.toString() === bank._id?.toString() ? (
+                                                            <div className="w-full px-4 py-2.5 bg-green-100 border-2 border-green-300 text-green-700 rounded-lg font-semibold flex items-center justify-center gap-2">
+                                                                <CheckCircle className="w-5 h-5" />
+                                                                Already Assigned
+                                                            </div>
+                                                        ) : request.reservedBy?.toString() === bank._id?.toString() ? (
+                                                            <div className="w-full px-4 py-2.5 bg-green-100 border-2 border-green-300 text-green-700 rounded-lg font-semibold flex items-center justify-center gap-2">
+                                                                <CheckCircle className="w-5 h-5" />
+                                                                Units Reserved
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleAssignBloodBank(bank._id)}
+                                                                disabled={assigning === bank._id || request.status === 'ASSIGNED'}
+                                                                className="w-full px-4 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                            >
+                                                                {assigning === bank._id ? (
+                                                                    <>
+                                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                                        Requesting...
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <CheckCircle className="w-4 h-4" />
+                                                                        Request Units from Blood Bank
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 );
                                             })

@@ -382,19 +382,31 @@ router.put("/org/:id/assign", authenticate, requireRole(ROLES.ORGANIZATION), asy
             // Auto-create appointment for donor
             const Appointment = (await import("../modules/Appointment.js")).default;
 
-            // Use provided date or default to 24 hours from now
-            const apptDateTime = appointmentDate ? new Date(appointmentDate) : new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-            appointment = await Appointment.create({
+            // Check if appointment already exists for this donor and request
+            const existingAppointment = await Appointment.findOne({
                 donorId: donorId,
-                organizationId: req.user.userId,
                 requestId: req.params.id,
-                dateTime: apptDateTime,
-                status: "UPCOMING",
-                notes: `Appointment for ${request.bloodGroup} blood donation - ${request.unitsNeeded} unit(s)`
+                status: { $in: ["UPCOMING", "CONFIRMED"] } // Only check active appointments
             });
 
-            console.log(`✅ Created appointment ${appointment._id} for donor ${donorId}`);
+            if (existingAppointment) {
+                console.log(`⚠️ Appointment already exists for donor ${donorId} and request ${req.params.id}`);
+                appointment = existingAppointment;
+            } else {
+                // Use provided date or default to 24 hours from now
+                const apptDateTime = appointmentDate ? new Date(appointmentDate) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+                appointment = await Appointment.create({
+                    donorId: donorId,
+                    organizationId: req.user.userId,
+                    requestId: req.params.id,
+                    dateTime: apptDateTime,
+                    status: "UPCOMING",
+                    notes: `Appointment for ${request.bloodGroup} blood donation - ${request.unitsNeeded} unit(s)`
+                });
+
+                console.log(`✅ Created NEW appointment ${appointment._id} for donor ${donorId}`);
+            }
         } else if (bloodBankId) {
             request.assignedTo = { type: "BLOOD_BANK", organizationId: bloodBankId };
             request.status = REQUEST_STATUS.ASSIGNED;

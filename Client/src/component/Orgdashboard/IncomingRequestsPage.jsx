@@ -64,14 +64,17 @@ const IncomingRequestsPage = () => {
 
             const response = await requestApi.getIncomingRequests(params);
 
+            // Backend returns array directly, not wrapped in object
+            const requestsArray = Array.isArray(response) ? response : (response.requests || response.items || []);
+
             if (isRefresh) {
-                setRequests(response.requests || response.items || []);
+                setRequests(requestsArray);
                 setPage(1);
             } else {
                 setRequests(prev =>
                     page === 1
-                        ? response.requests || response.items || []
-                        : [...prev, ...(response.requests || response.items || [])]
+                        ? requestsArray
+                        : [...prev, ...requestsArray]
                 );
             }
 

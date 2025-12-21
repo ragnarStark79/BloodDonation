@@ -85,22 +85,58 @@ const DonationPipelineTab = () => {
                 adminApi.getDonations().catch(() => ({ 'new-donors': { items: [] }, 'screening': { items: [] }, 'in-progress': { items: [] }, 'completed': { items: [] }, 'ready-storage': { items: [] } }))
             ]);
 
-            // Convert UPCOMING appointments to NEW DONORS
-            const upcomingAppointments = (appointmentsData.appointments || [])
+            console.log('Raw appointments data:', appointmentsData);
+
+            // Handle both response formats: { appointments: [...] } or [...]
+            const appointmentsArray = Array.isArray(appointmentsData)
+                ? appointmentsData
+                : (appointmentsData.appointments || []);
+
+            console.log('Appointments array:', appointmentsArray);
+            console.log('First appointment:', appointmentsArray[0]);
+
+            // Collect all appointmentIds that already have donations
+            const existingAppointmentIds = new Set();
+            Object.values(donationsData).forEach(stage => {
+                if (stage.items) {
+                    stage.items.forEach(item => {
+                        if (item.appointmentId) {
+                            existingAppointmentIds.add(item.appointmentId.toString());
+                        }
+                    });
+                }
+            });
+
+            console.log('Existing appointment IDs with donations:', Array.from(existingAppointmentIds));
+
+            // Convert UPCOMING appointments to NEW DONORS, but exclude ones that already have donations
+            const upcomingAppointments = appointmentsArray
                 .filter(apt => apt.status === 'UPCOMING')
-                .map(apt => ({
-                    _id: apt._id,
-                    donorId: apt.donorId?._id || apt.donorId,
-                    donorName: apt.donorId?.Name || 'Unknown Donor',
-                    bloodGroup: apt.donorId?.bloodGroup || apt.bloodGroup || 'Unknown',
-                    phone: apt.donorId?.PhoneNumber || apt.donorId?.Phone || 'N/A',
-                    email: apt.donorId?.Email || 'N/A',
-                    appointmentDate: apt.dateTime,
-                    requestId: apt.requestId,
-                    notes: apt.notes || '',
-                    stage: 'new-donor',
-                    fromAppointment: true
-                }));
+                .filter(apt => !existingAppointmentIds.has(apt._id.toString())) // DEDUPLICATION: Skip appointments that already have donations
+                .map(apt => {
+                    console.log('Processing appointment:', apt);
+                    console.log('Donor data:', apt.donorId);
+
+                    return {
+                        id: apt._id, // DonorDetailsModal expects 'id' not  '_id'
+                        _id: apt._id,
+                        donorId: apt.donorId?._id || apt.donorId,
+                        name: apt.donorId?.Name || 'Unknown Donor', // DonorDetailsModal expects 'name' not 'donorName'
+                        group: apt.donorId?.bloodGroup || apt.bloodGroup || 'Unknown', // DonorDetailsModal expects 'group' not 'bloodGroup'
+                        phone: apt.donorId?.PhoneNumber || apt.donorId?.phone || 'Not provided',
+                        email: apt.donorId?.Email || apt.donorId?.email || 'Not provided',
+                        date: apt.dateTime || apt.createdAt || new Date(), // DonorDetailsModal expects 'date'
+                        appointmentDate: apt.dateTime,
+                        requestId: apt.requestId,
+                        notes: apt.notes || `Created from appointment on ${new Date(apt.dateTime || Date.now()).toLocaleDateString()}`,
+                        stage: 'new-donors', // Changed from 'new-donor' to 'new-donors' to match column ID
+                        status: 'Active',
+                        appointmentId: apt._id,
+                        fromAppointment: true
+                    };
+                });
+
+            console.log(`Filtered appointments: ${upcomingAppointments.length} (excluded ${existingAppointmentIds.size} with existing donations)`);
 
             // Merge with existing donations data
             const newColumns = {
@@ -113,7 +149,7 @@ const DonationPipelineTab = () => {
                 'screening': donationsData['screening'] || { id: 'screening', title: 'SCREENING', color: 'from-blue-50 to-blue-100/50', items: [] },
                 'in-progress': donationsData['in-progress'] || { id: 'in-progress', title: 'IN PROGRESS', color: 'from-yellow-50 to-yellow-100/50', items: [] },
                 'completed': donationsData['completed'] || { id: 'completed', title: 'COMPLETED', color: 'from-green-50 to-green-100/50', items: [] },
-                'ready-storage': donationsData['ready-storage'] || { id: 'ready-storage', title: 'READY FOR STORAGE', color: 'from-purple-50 to-purple-100/50', items: [] }
+                'ready-storage': { id: 'ready-storage', title: 'READY FOR STORAGE', color: 'from-purple-50 to-purple-100/50', items: [] } // Column visible but donations go to inventory
             };
 
             setDonationColumns(newColumns);
@@ -342,10 +378,58 @@ const DonationPipelineTab = () => {
 
         // Call backend API
         try {
-            // Assuming draggableId is the donationId
-            const donationId = draggableId;
-            await adminApi.updateDonationStage(donationId, destination.droppableId, user.userId);
-            toast.success(`Moved to ${destCol.title}`);
+            const movedItem = sourceCol.items[source.index];
+
+            // Check if this is an appointment being moved (from NEW DONORS)
+            if (movedItem.fromAppointment && source.droppableId === 'new-donors') {
+                console.log('Moving appointment to donation pipeline, creating donation first...');
+
+                // Create a donation record from the appointment
+                const donationData = {
+                    donorName: movedItem.name,
+                    bloodGroup: movedItem.group,
+                    phone: movedItem.phone,
+                    email: movedItem.email,
+                    notes: movedItem.notes,
+                    appointmentId: movedItem.appointmentId || movedItem._id,
+                    organizationId: user._id
+                };
+
+                try {
+                    const newDonation = await adminApi.createDonation(donationData);
+                    console.log('Created donation response:', newDonation);
+                    console.log('Response keys:', Object.keys(newDonation));
+
+                    // Extract donation ID safely - API returns {_id: ..., donation: {...}} format
+                    const donationId = newDonation._id || newDonation.donation?._id || newDonation.donation?.id || newDonation.id;
+                    console.log('Extracted donation ID:', donationId);
+
+                    if (!donationId) {
+                        console.error('No donation ID in response:', newDonation);
+                        throw new Error('Donation created but no ID returned from API');
+                    }
+
+                    // Now update the donation stage to destination
+                    await adminApi.updateDonationStage(donationId, destination.droppableId, user._id);
+                    toast.success(`Moved to ${destCol.title}`);
+                } catch (createError) {
+                    // Check if this is a duplicate error
+                    if (createError.response?.status === 400 && createError.response?.data?.message?.includes('already exists')) {
+                        console.log('Donation already exists for this appointment, fetching to sync...');
+                        toast.info('Donation already exists for this appointment');
+                        // Refresh to get the correct state
+                        await fetchDonations();
+                        return;
+                    }
+                    throw createError; // Re-throw if not a duplicate error
+                }
+            } else {
+                // Regular donation move
+                const donationId = draggableId;
+                await adminApi.updateDonationStage(donationId, destination.droppableId, user.userId);
+                toast.success(`Moved to ${destCol.title}`);
+            }
+
             await fetchDonations();
             fetchStats(); // Refresh stats after move
         } catch (error) {
@@ -356,25 +440,26 @@ const DonationPipelineTab = () => {
     };
 
     const handleCardClick = (item, columnId) => {
-        // Open details modal for new donors
+        // Close all modals first to ensure only one shows
+        setShowDetailsModal(false);
+        setShowScreeningModal(false);
+        setShowCollectionModal(false);
+        setShowLabTestModal(false);
+
+        // Set the selected donation
+        setSelectedDonation(item);
+
+        // Open the appropriate modal based on column
         if (columnId === 'new-donors') {
-            setSelectedDonation(item);
             setShowDetailsModal(true);
-        }
-        // Open screening modal for screening stage
-        else if (columnId === 'screening') {
-            setSelectedDonation(item);
+        } else if (columnId === 'screening') {
             setShowScreeningModal(true);
-        }
-        // Open collection modal for in-progress stage
-        else if (columnId === 'in-progress') {
-            setSelectedDonation(item);
+        } else if (columnId === 'in-progress') {
             setShowCollectionModal(true);
-        }
-        // Open lab test modal for completed stage
-        else if (columnId === 'completed') {
-            setSelectedDonation(item);
+        } else if (columnId === 'completed') {
             setShowLabTestModal(true);
+        } else if (columnId === 'ready-storage') {
+            setShowDetailsModal(true);
         }
     };
 
@@ -758,6 +843,58 @@ const DonationPipelineTab = () => {
                     onClose={() => {
                         setShowDetailsModal(false);
                         setSelectedDonation(null);
+                    }}
+                    onNext={async (donation) => {
+                        try {
+                            // Check if this is an appointment (from NEW DONORS)
+                            if (donation.fromAppointment) {
+                                // Create donation record first
+                                const donationData = {
+                                    donorName: donation.name,
+                                    bloodGroup: donation.group,
+                                    phone: donation.phone,
+                                    email: donation.email,
+                                    notes: donation.notes,
+                                    appointmentId: donation.appointmentId || donation._id,
+                                    organizationId: user._id
+                                };
+
+                                try {
+                                    const newDonation = await adminApi.createDonation(donationData);
+                                    const donationId = newDonation._id || newDonation.donation?._id || newDonation.donation?.id || newDonation.id;
+
+                                    if (donationId) {
+                                        // Move to screening
+                                        await adminApi.updateDonationStage(donationId, 'screening', user._id);
+                                        toast.success('Moved to SCREENING');
+                                    }
+                                } catch (createError) {
+                                    if (createError.response?.status === 400 && createError.response?.data?.message?.includes('already exists')) {
+                                        // If donation already exists, find it and move it
+                                        const existingDonationId = createError.response?.data?.donationId;
+                                        if (existingDonationId) {
+                                            await adminApi.updateDonationStage(existingDonationId, 'screening', user._id);
+                                            toast.success('Moved to SCREENING');
+                                        }
+                                    } else {
+                                        throw createError;
+                                    }
+                                }
+                            } else {
+                                // Regular donation move
+                                await adminApi.updateDonationStage(donation.id, 'screening', user._id);
+                                toast.success('Moved to SCREENING');
+                            }
+
+                            // Close modal and refresh
+                            setShowDetailsModal(false);
+                            setSelectedDonation(null);
+                            await fetchDonations();
+                            fetchStats();
+                        } catch (error) {
+                            console.error('Failed to move to screening:', error);
+                            toast.error('Failed to move to screening');
+                        }
                     }}
                 />
             )}

@@ -14,7 +14,7 @@ const adminOrOrg = auth([ROLES.ADMIN, ROLES.ORGANIZATION]);
 router.get("/", adminOrOrg, async (req, res) => {
     try {
         // Filter by organization for non-admin users
-        const query = { status: "active" };
+        const query = { status: { $in: ["active", "completed"] } }; // Include both active and completed (ready-storage) donations
         if (req.user.role !== ROLES.ADMIN) {
             query.organizationId = req.user.userId;
         }
@@ -70,6 +70,11 @@ router.get("/", adminOrOrg, async (req, res) => {
                 screeningNotes: donation.screeningNotes,
                 bloodBagId: donation.bloodBagId,
                 unitsCollected: donation.unitsCollected,
+                appointmentId: donation.appointmentId, // Add appointmentId for deduplication
+                screening: donation.screening,
+                screeningStatus: donation.screeningStatus,
+                collection: donation.collection,
+                labTests: donation.labTests,
             };
 
             if (grouped[donation.stage]) {
@@ -89,12 +94,33 @@ router.get("/", adminOrOrg, async (req, res) => {
 // @access  Admin
 router.post("/", adminOrOrg, async (req, res) => {
     try {
-        const { donorName, bloodGroup, phone, email, notes, donorId } = req.body;
+        const { donorName, bloodGroup, phone, email, notes, donorId, appointmentId } = req.body;
 
         if (!donorName || !bloodGroup) {
             return res
                 .status(400)
                 .json({ message: "Donor name and blood group are required" });
+        }
+
+        // Check for duplicate donation if appointmentId is provided
+        if (appointmentId) {
+            const existingDonation = await Donation.findOne({ appointmentId });
+            if (existingDonation) {
+                return res.status(400).json({
+                    message: "Donation already exists for this appointment",
+                    donationId: existingDonation._id,
+                    donation: {
+                        _id: existingDonation._id.toString(),
+                        id: existingDonation._id.toString(),
+                        name: existingDonation.donorName,
+                        group: existingDonation.bloodGroup,
+                        date: existingDonation.donationDate,
+                        phone: existingDonation.phone,
+                        email: existingDonation.email,
+                        stage: existingDonation.stage,
+                    }
+                });
+            }
         }
 
         const donation = new Donation({
@@ -104,6 +130,7 @@ router.post("/", adminOrOrg, async (req, res) => {
             email,
             notes,
             donorId: donorId || null,
+            appointmentId: appointmentId || null,
             stage: "new-donors",
             createdBy: req.user.userId,
             organizationId: req.user.role === ROLES.ADMIN ? req.body.organizationId || req.user.userId : req.user.userId,
@@ -113,7 +140,9 @@ router.post("/", adminOrOrg, async (req, res) => {
 
         res.status(201).json({
             message: "Donation created successfully",
+            _id: donation._id.toString(), // Add _id at root level for consistency
             donation: {
+                _id: donation._id.toString(), // Include both _id and id for compatibility
                 id: donation._id.toString(),
                 name: donation.donorName,
                 group: donation.bloodGroup,
@@ -121,6 +150,7 @@ router.post("/", adminOrOrg, async (req, res) => {
                 phone: donation.phone,
                 email: donation.email,
                 stage: donation.stage,
+                appointmentId: donation.appointmentId,
             },
         });
     } catch (error) {
@@ -137,7 +167,7 @@ router.put("/:id/stage", adminOrOrg, async (req, res) => {
         const { stage } = req.body;
 
         if (
-            !["new-donors", "screening", "in-progress", "completed", "ready-storage"].includes(
+            !["new-donors", "screening", "in-progress", "completed", "ready-storage", "rejected"].includes(
                 stage
             )
         ) {
@@ -339,24 +369,58 @@ router.put("/:id/lab-tests", adminOrOrg, async (req, res) => {
 
         // If all tests passed, auto-move to ready-storage
         if (allTestsPassed) {
-            const oldStage = donation.stage;
-            donation.stage = "ready-storage";
+            // Use moveToStage to handle all related updates (appointment status, request fulfillment, history)
+            await donation.moveToStage(
+                "ready-storage",
+                req.user.userId,
+                "Auto-moved after passing all lab tests"
+            );
+        } else {
+            // Tests failed - mark as rejected and reopen request
+            console.log(`⚠️ Lab tests FAILED for donation ${donation._id}. Failed tests: ${failedTests.join(', ')}`);
 
-            // Update timestamps
-            if (!donation.expiryDate) {
-                donation.expiryDate = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000);
+            // Mark donation as rejected
+            await donation.moveToStage(
+                "rejected",
+                req.user.userId,
+                `Lab tests failed: ${failedTests.join(', ')}`
+            );
+
+            // Get linked appointment and request
+            const Appointment = (await import("../modules/Appointment.js")).default;
+            const Request = (await import("../modules/Request.js")).default;
+
+            if (donation.appointmentId) {
+                try {
+                    const appointment = await Appointment.findById(donation.appointmentId).populate('requestId');
+
+                    if (appointment) {
+                        // Update appointment status to REJECTED
+                        appointment.status = "REJECTED";
+                        appointment.completedAt = new Date();
+                        appointment.notes = `Lab tests failed: ${failedTests.join(', ')}`;
+                        await appointment.save();
+                        console.log(`✅ Appointment ${appointment._id} marked as REJECTED`);
+
+                        // Reopen the blood request if it exists
+                        if (appointment.requestId) {
+                            const request = await Request.findById(appointment.requestId);
+
+                            if (request && request.status === "ASSIGNED") {
+                                // Reset request to OPEN so hospital can assign another donor
+                                request.status = "OPEN";
+                                request.assignedTo = undefined; // Clear assignment
+                                request.notes = `Previous donor's lab tests failed (${failedTests.join(', ')}). Request reopened for new assignment.`;
+                                await request.save();
+
+                                console.log(`✅ Request ${request._id} reopened - ready for new donor assignment`);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error handling failed test cleanup:", error);
+                }
             }
-            donation.status = "completed";
-            donation.completionDate = new Date();
-
-            // Add move history entry manually
-            donation.history.push({
-                stage: "ready-storage",
-                action: `Moved from ${oldStage} to ready-storage`,
-                performedBy: req.user.userId,
-                performedAt: new Date(),
-                notes: "Auto-moved after passing all lab tests"
-            });
         }
 
         await donation.save();
@@ -364,12 +428,15 @@ router.put("/:id/lab-tests", adminOrOrg, async (req, res) => {
         res.json({
             message: allTestsPassed
                 ? "Lab tests passed! Donation moved to Ready for Storage"
-                : "Lab test results saved",
+                : `Lab tests failed (${failedTests.join(', ')}). Donation rejected and blood request reopened for new donor.`,
             donation: {
                 id: donation._id.toString(),
                 labTests: donation.labTests,
                 stage: donation.stage,
+                status: donation.status
             },
+            testsFailed: !allTestsPassed,
+            failedTests: allTestsPassed ? [] : failedTests
         });
     } catch (error) {
         console.error("Error updating lab test data:", error);

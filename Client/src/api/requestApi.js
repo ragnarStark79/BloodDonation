@@ -119,7 +119,7 @@ const requestApi = {
      */
     getIncomingRequests: async (params = {}) => {
         const { page = 1, limit = 10, bloodGroup, urgency } = params;
-        const response = await client.get('/api/requests/org/incoming', {
+        const response = await client.get('/api/org/requests/incoming', {  // FIXED: Changed from /api/requests/org/incoming
             params: { page, limit, bloodGroup, urgency }
         });
         return response.data;

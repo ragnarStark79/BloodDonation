@@ -26,8 +26,8 @@ export const orgApi = {
     },
 
     // Batch Operations
-    batchReserveUnits: async (unitIds) => {
-        const res = await client.put("/api/org/inventory/batch/reserve", { unitIds });
+    batchReserveUnits: async (unitIds, requestId = null) => {
+        const res = await client.put("/api/org/inventory/batch/reserve", { unitIds, requestId });
         return res.data;
     },
     batchIssueUnits: async (unitIds) => {

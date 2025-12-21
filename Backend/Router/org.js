@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import { auth } from "../Middleware/auth.js";
 import { ROLES, REQUEST_STATUS, ORG_TYPES } from "../config/constants.js";
 import { requireOrgType, canManageInventory, canCreateRequests, canViewIncoming } from "../Middleware/orgAuth.js";
@@ -406,7 +407,7 @@ router.get("/inventory/expiring", auth([ROLES.ORGANIZATION]), canManageInventory
 // Bulk reserve blood units
 router.put("/inventory/batch/reserve", auth([ROLES.ORGANIZATION]), canManageInventory, async (req, res) => {
   try {
-    const { unitIds } = req.body;
+    const { unitIds, requestId } = req.body;
 
     if (!Array.isArray(unitIds) || unitIds.length === 0) {
       return res.status(400).json({ message: "unitIds array is required" });
@@ -419,8 +420,29 @@ router.put("/inventory/batch/reserve", auth([ROLES.ORGANIZATION]), canManageInve
         organizationId: req.user.userId,
         status: "AVAILABLE"
       },
-      { $set: { status: "RESERVED" } }
+      {
+        $set: {
+          status: "RESERVED",
+          reservedAt: new Date(),
+          reservedBy: req.user.userId
+        }
+      }
     );
+
+    // If requestId is provided, update the request status
+    if (requestId) {
+      await Request.findByIdAndUpdate(requestId, {
+        $set: {
+          status: REQUEST_STATUS.ASSIGNED,
+          reservedUnits: unitIds,
+          reservedBy: req.user.userId,
+          reservedAt: new Date(),
+          'assignedTo.type': 'BLOOD_BANK',
+          'assignedTo.organizationId': req.user.userId
+        }
+      });
+      console.log(`✅ Request ${requestId} marked as ASSIGNED with ${result.modifiedCount} units reserved`);
+    }
 
     res.json({
       message: `${result.modifiedCount} unit(s) reserved`,
@@ -491,26 +513,105 @@ router.put("/inventory/batch/expire", auth([ROLES.ORGANIZATION]), canManageInven
 });
 
 // ============ REQUEST MANAGEMENT ============
-// Incoming requests matching inventory (Blood Banks only)
+// Incoming requests matching inventory (Blood Banks only) - ENHANCED
 router.get("/requests/incoming", auth([ROLES.ORGANIZATION]), canViewIncoming, async (req, res) => {
   try {
-    // collect distinct blood groups available
-    const groups = await BloodUnit.distinct("bloodGroup", {
-      organizationId: req.user.userId,
-      status: "AVAILABLE",
+    const orgId = req.user.userId;
+    console.log('🔍 [Incoming Requests] Blood Bank ID:', orgId);
+
+    // Get blood bank's location for distance calculation
+    const bloodBank = await User.findById(orgId).select("locationGeo Name organizationName").lean();
+
+    if (!bloodBank) {
+      return res.status(404).json({ message: "Organization not found" });
+    }
+    console.log('🏦 [Incoming Requests] Blood Bank:', bloodBank.organizationName || bloodBank.Name);
+
+    // IMPORTANT: Convert orgId to ObjectId for aggregate query
+    const orgObjectId = new mongoose.Types.ObjectId(orgId);
+
+    // Get available blood groups with counts per group
+    const inventoryCounts = await BloodUnit.aggregate([
+      {
+        $match: {
+          organizationId: orgObjectId,  // Use ObjectId instead of string
+          status: "AVAILABLE"
+        }
+      },
+      {
+        $group: {
+          _id: "$bloodGroup",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Create map: bloodGroup -> available count
+    const groupCountMap = {};
+    const availableGroups = [];
+    inventoryCounts.forEach(item => {
+      groupCountMap[item._id] = item.count;
+      availableGroups.push(item._id);
     });
+
+    console.log('📦 [Incoming Requests] Available Groups:', availableGroups);
+    console.log('📊 [Incoming Requests] Inventory Counts:', groupCountMap);
+
+    // If no inventory, return empty array
+    if (availableGroups.length === 0) {
+      console.log('❌ [Incoming Requests] No inventory found, returning empty array');
+      return res.json([]);
+    }
+
+    // Get requests matching available blood groups
     const requests = await Request.find({
-      bloodGroup: { $in: groups },
+      bloodGroup: { $in: availableGroups },
       status: REQUEST_STATUS.OPEN,
-      createdBy: { $ne: req.user.userId } // Don't show own requests
+      createdBy: { $ne: orgId } // Don't show own requests
     })
-      .populate("createdBy", "Name organizationName City Email")
+      .populate("createdBy", "Name organizationName City Email Phone locationGeo")
       .sort({ urgency: -1, createdAt: -1 })
       .limit(50)
       .lean();
-    res.json(requests);
+
+    console.log('📋 [Incoming Requests] Found requests:', requests.length);
+
+    // Enrich requests with stock availability and distance
+    const enrichedRequests = requests.map(request => {
+      const availableUnits = groupCountMap[request.bloodGroup] || 0;
+      const canFulfill = availableUnits >= request.unitsNeeded;
+
+      // Calculate distance if both have location
+      let distance = null;
+      if (bloodBank.locationGeo && request.location && request.location.coordinates) {
+        // Simple distance calculation using Haversine formula
+        const [lng1, lat1] = bloodBank.locationGeo.coordinates || [0, 0];
+        const [lng2, lat2] = request.location.coordinates || [0, 0];
+
+        const R = 6371; // Earth's radius in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        distance = R * c; // Distance in km
+      }
+
+      return {
+        ...request,
+        canFulfill,
+        availableUnits,
+        distance,
+        // Add hospital name for easier display
+        hospitalName: request.createdBy?.organizationName || request.createdBy?.Name,
+        contactPhone: request.createdBy?.Phone || request.contactPhone
+      };
+    });
+
+    res.json(enrichedRequests);
   } catch (err) {
-    console.error(err);
+    console.error("Incoming requests error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

@@ -176,6 +176,12 @@ router.get("/org", orgAuth, async (req, res) => {
             .limit(parseInt(limit))
             .lean();
 
+        console.log(`[Appointments API] Found ${appointments.length} appointments for org ${req.user.userId}`);
+        appointments.forEach((apt, index) => {
+            console.log(`  ${index + 1}. Status: ${apt.status}, Donor: ${apt.donorId?.Name || 'N/A'}, Date: ${apt.dateTime}`);
+        });
+
+
         const total = await Appointment.countDocuments(query);
 
         res.json({
@@ -190,6 +196,76 @@ router.get("/org", orgAuth, async (req, res) => {
     } catch (error) {
         console.error("Error fetching org appointments:", error);
         res.status(500).json({ message: "Failed to fetch appointments" });
+    }
+});
+
+/**
+ * DELETE /api/appointments/org/cleanup-duplicates
+ * Clean up duplicate appointments (for debugging)
+ */
+router.delete("/org/cleanup-duplicates", orgAuth, async (req, res) => {
+    try {
+        const { dryRun = true } = req.query; // Default to dry run for safety
+
+        // Find all appointments for this organization
+        const allAppointments = await Appointment.find({ organizationId: req.user.userId })
+            .populate("donorId", "Name")
+            .sort({ createdAt: 1 }); // Oldest first
+
+        console.log(`Found ${allAppointments.length} total appointments for org ${req.user.userId}`);
+
+        // Group by donorId + requestId to find duplicates
+        const groups = {};
+        allAppointments.forEach(apt => {
+            const key = `${apt.donorId?._id || 'unknown'}_${apt.requestId || 'unknown'}`;
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+            groups[key].push(apt);
+        });
+
+        // Find duplicates (groups with more than 1 appointment)
+        const duplicateGroups = Object.entries(groups).filter(([_, apts]) => apts.length > 1);
+
+        const toDelete = [];
+        duplicateGroups.forEach(([key, appointments]) => {
+            // Keep the first (oldest) appointment, mark rest for deletion
+            const [keep, ...duplicates] = appointments;
+            console.log(`Duplicate group ${key}: Keeping ${keep._id}, ${duplicates.length} duplicates`);
+            toDelete.push(...duplicates.map(d => d._id));
+        });
+
+        if (dryRun === 'false') {
+            // Actually delete
+            const result = await Appointment.deleteMany({ _id: { $in: toDelete } });
+            console.log(`✅ Deleted ${result.deletedCount} duplicate appointments`);
+
+            res.json({
+                message: `Deleted ${result.deletedCount} duplicate appointments`,
+                deletedCount: result.deletedCount,
+                duplicateGroups: duplicateGroups.length
+            });
+        } else {
+            // Dry run - just report what would be deleted
+            res.json({
+                message: `DRY RUN: Found ${toDelete.length} duplicate appointments that would be deleted`,
+                wouldDelete: toDelete.length,
+                duplicateGroups: duplicateGroups.map(([key, apts]) => ({
+                    donorName: apts[0].donorId?.Name,
+                    count: apts.length,
+                    appointments: apts.map(a => ({
+                        id: a._id,
+                        status: a.status,
+                        date: a.dateTime,
+                        createdAt: a.createdAt
+                    }))
+                })),
+                note: "Add ?dryRun=false to actually delete duplicates"
+            });
+        }
+    } catch (error) {
+        console.error("Error cleaning up duplicates:", error);
+        res.status(500).json({ message: "Failed to clean up duplicates" });
     }
 });
 

@@ -31,16 +31,48 @@ const ReserveUnitsModal = ({ request, isOpen, onClose, onSuccess }) => {
             // Get inventory for the requested blood group
             const response = await orgApi.getInventory();
 
+            console.log('📦 Inventory API Response:', response);
+            console.log('📦 Response type:', typeof response);
+            console.log('📦 Is Array?:', Array.isArray(response));
+            console.log('📦 Response keys:', response ? Object.keys(response) : 'null/undefined');
+
+            // Handle multiple possible response formats
+            let units = [];
+
+            if (Array.isArray(response)) {
+                // Direct array response
+                units = response;
+            } else if (response && typeof response === 'object') {
+                // Object response - try multiple properties
+                units = response.units || response.data || response.items || [];
+            }
+
+            console.log('📦 Units after parsing:', units);
+            console.log('📦 Units length:', units?.length);
+            console.log('📦 Units is array?:', Array.isArray(units));
+
+            if (!Array.isArray(units)) {
+                console.error('❌ Units is not an array:', units);
+                toast.error('Invalid inventory data format');
+                setAvailableUnits([]);
+                return;
+            }
+
             // Filter for available units matching the blood group
-            const matching = response.units.filter(unit =>
-                unit.bloodGroup === request.bloodGroup &&
-                unit.status === 'AVAILABLE'
+            const matching = units.filter(unit =>
+                unit?.bloodGroup === request?.bloodGroup &&
+                unit?.status === 'AVAILABLE'
             );
+
+            console.log('✅ Matching units:', matching.length);
+            console.log('✅ Matching units details:', matching);
 
             setAvailableUnits(matching);
         } catch (error) {
-            console.error('Failed to fetch units:', error);
+            console.error('❌ Failed to fetch units:', error);
+            console.error('❌ Error stack:', error.stack);
             toast.error('Failed to load available units');
+            setAvailableUnits([]);
         } finally {
             setLoading(false);
         }
@@ -75,8 +107,9 @@ const ReserveUnitsModal = ({ request, isOpen, onClose, onSuccess }) => {
 
         try {
             setReserving(true);
-            await requestApi.reserveUnits(request._id, { unitIds: selectedUnits });
-            toast.success(`${selectedUnits.length} units reserved successfully!`);
+            // Pass requestId so backend can update request status
+            await orgApi.batchReserveUnits(selectedUnits, request._id);
+            toast.success(`${selectedUnits.length} units reserved for ${request.hospitalName || 'hospital'}!`);
             onSuccess();
             handleClose();
         } catch (error) {
@@ -162,16 +195,16 @@ const ReserveUnitsModal = ({ request, isOpen, onClose, onSuccess }) => {
                                             key={unit._id}
                                             onClick={() => toggleUnit(unit._id)}
                                             className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${isSelected
-                                                    ? 'border-blue-500 bg-blue-50'
-                                                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                                                ? 'border-blue-500 bg-blue-50'
+                                                : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                                                 }`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-4 flex-1">
                                                     {/* Checkbox */}
                                                     <div className={`w-6 h-6 rounded border-2 flex items-center justify-center ${isSelected
-                                                            ? 'bg-blue-600 border-blue-600'
-                                                            : 'border-gray-300'
+                                                        ? 'bg-blue-600 border-blue-600'
+                                                        : 'border-gray-300'
                                                         }`}>
                                                         {isSelected && <CheckCircle className="w-5 h-5 text-white" />}
                                                     </div>
@@ -200,8 +233,8 @@ const ReserveUnitsModal = ({ request, isOpen, onClose, onSuccess }) => {
 
                                                     {/* Expiry Badge */}
                                                     <div className={`px-3 py-1 rounded-full text-sm font-semibold ${isExpiringSoon
-                                                            ? 'bg-yellow-100 text-yellow-700'
-                                                            : 'bg-green-100 text-green-700'
+                                                        ? 'bg-yellow-100 text-yellow-700'
+                                                        : 'bg-green-100 text-green-700'
                                                         }`}>
                                                         {daysUntilExpiry} days left
                                                     </div>

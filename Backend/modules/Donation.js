@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import Appointment from "./Appointment.js";
+import Request from "./Request.js";
 
 const donationSchema = new mongoose.Schema(
     {
@@ -26,6 +28,7 @@ const donationSchema = new mongoose.Schema(
                 "in-progress",
                 "completed",
                 "ready-storage",
+                "rejected",
             ],
             default: "new-donors",
         },
@@ -253,7 +256,7 @@ donationSchema.virtual("daysOld").get(function () {
 });
 
 // Method to move to next stage
-donationSchema.methods.moveToStage = function (newStage, performedBy, notes = "") {
+donationSchema.methods.moveToStage = async function (newStage, performedBy, notes = "") {
     const oldStage = this.stage;
     this.stage = newStage;
 
@@ -262,11 +265,20 @@ donationSchema.methods.moveToStage = function (newStage, performedBy, notes = ""
         this.startedAt = new Date();
     } else if (newStage === "completed" && !this.completedAt) {
         this.completedAt = new Date();
+        // Lab testing stage - do NOT auto-fulfill yet
+        // Will auto-fulfill only if tests pass and move to ready-storage
     } else if (newStage === "ready-storage" && !this.expiryDate) {
         // Set expiry to 35 days from collection (standard for whole blood)
         this.expiryDate = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000);
         this.status = "completed";
         this.completionDate = new Date();
+
+        // Auto-fulfill appointment and request
+        await this.autoFulfillRequest();
+    } else if (newStage === "rejected") {
+        // Mark donation as rejected (failed lab tests)
+        this.status = "rejected";
+        this.completedAt = new Date();
     }
 
     // Add to history
@@ -279,6 +291,77 @@ donationSchema.methods.moveToStage = function (newStage, performedBy, notes = ""
     });
 
     return this.save();
+};
+
+// Method to auto-fulfill appointment and request
+donationSchema.methods.autoFulfillRequest = async function () {
+    // Update linked appointment status to COLLECTED
+    if (this.appointmentId) {
+        console.log(`[Donation] Updating appointment ${this.appointmentId} to COLLECTED`);
+        try {
+            const updatedAppointment = await Appointment.findByIdAndUpdate(
+                this.appointmentId,
+                {
+                    status: "COLLECTED",
+                    completedAt: new Date()
+                },
+                { new: true } // Return updated document
+            ).populate('requestId');
+
+            if (updatedAppointment) {
+                console.log(`✅ Appointment ${this.appointmentId} updated to COLLECTED`);
+
+                // Auto-fulfill linked blood request if exists
+                if (updatedAppointment.requestId) {
+                    console.log(`[Donation] Auto-fulfilling request ${updatedAppointment.requestId}`);
+                    try {
+                        const request = await Request.findByIdAndUpdate(
+                            updatedAppointment.requestId,
+                            {
+                                status: "FULFILLED",
+                                fulfilledAt: new Date()
+                            },
+                            { new: true }
+                        );
+                        console.log(`✅ Request ${updatedAppointment.requestId} marked as FULFILLED`);
+
+                        // Update donor eligibility
+                        if (request?.assignedTo?.type === "DONOR" && request.assignedTo.donorId) {
+                            console.log(`[Donation] Updating donor ${request.assignedTo.donorId} eligibility`);
+                            try {
+                                const User = mongoose.model('User');
+                                const donor = await User.findById(request.assignedTo.donorId);
+
+                                if (donor) {
+                                    const donationDate = new Date();
+                                    donor.lastDonationDate = donationDate;
+
+                                    // Calculate next eligible date: 90 days
+                                    const nextEligibleDate = new Date(donationDate);
+                                    nextEligibleDate.setDate(nextEligibleDate.getDate() + 90);
+                                    donor.nextEligibleDate = nextEligibleDate;
+                                    donor.eligible = false; // Mark as ineligible
+
+                                    await donor.save();
+                                    console.log(`✅ Donor ${donor.Name} eligibility updated. Next eligible: ${nextEligibleDate.toDateString()}`);
+                                }
+                            } catch (donorError) {
+                                console.error("Error updating donor eligibility:", donorError);
+                            }
+                        }
+                    } catch (reqError) {
+                        console.error("Error fulfilling request:", reqError);
+                    }
+                }
+            } else {
+                console.log(`❌ Appointment ${this.appointmentId} NOT FOUND`);
+            }
+        } catch (error) {
+            console.error("Error updating appointment status:", error);
+        }
+    } else {
+        console.log('[Donation] No appointmentId linked to this donation');
+    }
 };
 
 // Method to add history entry
