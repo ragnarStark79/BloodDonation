@@ -13,6 +13,7 @@ import {
     Droplet
 } from 'lucide-react';
 import requestApi from '../../api/requestApi';
+import ReserveUnitsModal from './ReserveUnitsModal';
 import { toast } from 'sonner';
 import {
     REQUEST_STATUS,
@@ -157,8 +158,8 @@ const IncomingRequestsPage = () => {
                     <button
                         onClick={() => setShowFilters(!showFilters)}
                         className={`px-4 py-3 border rounded-lg flex items-center gap-2 transition-colors ${showFilters || activeFiltersCount > 0
-                                ? 'bg-purple-50 border-purple-300 text-purple-700'
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            ? 'bg-purple-50 border-purple-300 text-purple-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                             }`}
                     >
                         <Filter className="w-5 h-5" />
@@ -380,32 +381,16 @@ const IncomingRequestsPage = () => {
                 </div>
             )}
 
-            {/* Reserve Units Modal - Placeholder */}
-            {/* This would open a modal to select specific units from inventory */}
-            {reserveModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full">
-                        <h3 className="text-xl font-bold mb-4">Reserve Units</h3>
-                        <p className="text-gray-600 mb-4">
-                            Reserve {selectedRequest?.unitsNeeded} units of {selectedRequest?.bloodGroup} blood for {selectedRequest?.hospitalName}
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setReserveModalOpen(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleReserveSuccess}
-                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                            >
-                                Confirm Reserve
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
+            {/* Reserve Units Modal */}
+            <ReserveUnitsModal
+                request={selectedRequest}
+                isOpen={reserveModalOpen}
+                onClose={() => setReserveModalOpen(false)}
+                onSuccess={() => {
+                    fetchRequests(true); // Refresh requests after reservation
+                }}
+            />
         </div>
     );
 };

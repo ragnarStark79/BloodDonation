@@ -1,6 +1,7 @@
 import express from "express";
 import Request from "../modules/Request.js";
 import User from "../modules/User.js";
+import BloodUnit from "../modules/BloodUnit.js";
 import { authMiddleware } from "../Middleware/auth.js";
 import { donorAuth } from "../Middleware/donorAuth.js";
 import { orgAuth } from "../Middleware/orgAuth.js";
@@ -373,16 +374,109 @@ router.get("/org/:id/matches", orgAuth, async (req, res) => {
             .select("name phone bloodGroup location lastDonationDate nextEligibleDate")
             .lean();
 
-        // Add distance and eligibility (simplified)
-        const enrichedDonors = donors.map(donor => ({
-            ...donor,
-            distance: 5, // TODO: Calculate actual distance
-            isEligible: !donor.nextEligibleDate || new Date(donor.nextEligibleDate) <= new Date(),
-            interestedAt: request.createdAt // Approximation
-        }));
+        // Helper function to calculate distance
+        const calculateDistance = (coords1, coords2) => {
+            if (!coords1 || !coords2 || coords1.length !== 2 || coords2.length !== 2) {
+                return null;
+            }
 
-        // TODO: Find compatible blood banks with stock
-        const bloodBanks = [];
+            const [lon1, lat1] = coords1;
+            const [lon2, lat2] = coords2;
+
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return Math.round(R * c * 10) / 10;
+        };
+
+        // Add distance and eligibility to donors
+        const enrichedDonors = donors.map(donor => {
+            let distance = null;
+            if (request.location?.coordinates && donor.location?.coordinates) {
+                distance = calculateDistance(
+                    request.location.coordinates,
+                    donor.location.coordinates
+                );
+            }
+
+            return {
+                ...donor,
+                distance,
+                isEligible: !donor.nextEligibleDate || new Date(donor.nextEligibleDate) <= new Date(),
+                interestedAt: request.createdAt
+            };
+        });
+
+        // Find compatible blood banks with stock
+        const bloodBankUsers = await User.find({
+            organizationType: { $in: ["BANK", "BOTH"] },
+            _id: { $ne: request.organizationId } // Exclude requesting organization
+        })
+            .select("organizationName location city state phone email")
+            .lean();
+
+        // Check inventory for each blood bank
+        const bloodBanksWithStock = await Promise.all(
+            bloodBankUsers.map(async (bank) => {
+                // Get available units for the requested blood group
+                const availableUnits = await BloodUnit.countDocuments({
+                    organizationId: bank._id,
+                    bloodGroup: request.bloodGroup,
+                    status: "AVAILABLE"
+                });
+
+                // Calculate distance
+                let distance = null;
+                if (request.location?.coordinates && bank.location?.coordinates) {
+                    distance = calculateDistance(
+                        request.location.coordinates,
+                        bank.location.coordinates
+                    );
+                }
+
+                // Determine if bank can fulfill the request
+                const canFulfill = availableUnits >= request.unitsNeeded;
+
+                return {
+                    _id: bank._id,
+                    organizationName: bank.organizationName,
+                    city: bank.city,
+                    state: bank.state,
+                    phone: bank.phone,
+                    email: bank.email,
+                    location: bank.location,
+                    availableUnits,
+                    distance,
+                    canFulfill
+                };
+            })
+        );
+
+        // Filter to only banks with at least some stock, and sort by fulfillment capability then distance
+        const bloodBanks = bloodBanksWithStock
+            .filter(bank => bank.availableUnits > 0)
+            .sort((a, b) => {
+                // First priority: banks that can fulfill completely
+                if (a.canFulfill && !b.canFulfill) return -1;
+                if (!a.canFulfill && b.canFulfill) return 1;
+
+                // Second priority: more available units
+                if (a.availableUnits !== b.availableUnits) {
+                    return b.availableUnits - a.availableUnits;
+                }
+
+                // Third priority: closer distance
+                if (a.distance !== null && b.distance !== null) {
+                    return a.distance - b.distance;
+                }
+
+                return 0;
+            });
 
         res.json({
             donors: enrichedDonors,
@@ -501,6 +595,7 @@ router.put("/org/:id/cancel", orgAuth, async (req, res) => {
     }
 });
 
+
 /**
  * GET /api/org/requests/incoming
  * Get incoming requests for blood banks
@@ -509,11 +604,17 @@ router.get("/org/incoming", orgAuth, async (req, res) => {
     try {
         const { page = 1, limit = 10, bloodGroup, urgency } = req.query;
 
-        // Get organization
+        // Get organization with location
         const org = await User.findById(req.user.userId);
         if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
             return res.status(403).json({ message: "Only blood banks can access this" });
         }
+
+        // Get available blood groups in this bank's inventory
+        const availableGroups = await BloodUnit.distinct("bloodGroup", {
+            organizationId: req.user.userId,
+            status: "AVAILABLE"
+        });
 
         // Build query for open requests
         const query = {
@@ -521,27 +622,77 @@ router.get("/org/incoming", orgAuth, async (req, res) => {
             organizationId: { $ne: req.user.userId } // Exclude own requests
         };
 
-        if (bloodGroup) query.bloodGroup = bloodGroup;
+        // Filter by blood groups available in inventory if no specific filter
+        if (bloodGroup) {
+            query.bloodGroup = bloodGroup;
+        } else {
+            // Only show requests for blood we have in stock
+            query.bloodGroup = { $in: availableGroups };
+        }
+
         if (urgency) query.urgency = urgency;
 
-        // TODO: Filter by blood bank's available inventory
-        // TODO: Add geospatial filtering
-
         const requests = await Request.find(query)
-            .populate("organizationId", "organizationName location phone")
+            .populate("organizationId", "organizationName location phone city")
             .sort({ urgency: -1, createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(parseInt(limit))
             .lean();
 
-        // Add computed fields
-        const enrichedRequests = requests.map(req => ({
-            ...req,
-            hospitalName: req.organizationId?.organizationName,
-            distance: 10, // TODO: Calculate actual distance
-            canFulfill: true, // TODO: Check actual stock
-            availableUnits: 5 // TODO: Get from inventory
-        }));
+        // Helper function to calculate distance between two coordinates
+        const calculateDistance = (coords1, coords2) => {
+            if (!coords1 || !coords2 || coords1.length !== 2 || coords2.length !== 2) {
+                return null;
+            }
+
+            const [lon1, lat1] = coords1;
+            const [lon2, lat2] = coords2;
+
+            // Haversine formula
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+
+            return Math.round(distance * 10) / 10; // Round to 1 decimal
+        };
+
+        // Enrich requests with actual inventory data and distance
+        const enrichedRequests = await Promise.all(
+            requests.map(async (req) => {
+                // Get actual available units for this blood group
+                const availableUnits = await BloodUnit.countDocuments({
+                    organizationId: org._id,
+                    bloodGroup: req.bloodGroup,
+                    status: "AVAILABLE"
+                });
+
+                // Calculate actual distance
+                let distance = null;
+                if (org.location?.coordinates && req.location?.coordinates) {
+                    distance = calculateDistance(
+                        org.location.coordinates,
+                        req.location.coordinates
+                    );
+                }
+
+                // Determine if we can fulfill this request
+                const canFulfill = availableUnits >= req.unitsNeeded;
+
+                return {
+                    ...req,
+                    hospitalName: req.organizationId?.organizationName,
+                    distance,
+                    canFulfill,
+                    availableUnits
+                };
+            })
+        );
 
         const total = await Request.countDocuments(query);
 
@@ -557,6 +708,241 @@ router.get("/org/incoming", orgAuth, async (req, res) => {
         res.status(500).json({ message: "Failed to fetch incoming requests" });
     }
 });
+
+/**
+ * POST /api/requests/org/:id/reserve
+ * Reserve blood units for a request (Blood Bank)
+ */
+router.post("/org/:id/reserve", orgAuth, async (req, res) => {
+    try {
+        const { unitIds } = req.body; // Array of BloodUnit IDs to reserve
+
+        if (!unitIds || !Array.isArray(unitIds) || unitIds.length === 0) {
+            return res.status(400).json({ message: "Unit IDs array is required" });
+        }
+
+        // Get organization
+        const org = await User.findById(req.user.userId);
+        if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
+            return res.status(403).json({ message: "Only blood banks can reserve units" });
+        }
+
+        // Get request
+        const request = await Request.findById(req.params.id);
+        if (!request) {
+            return res.status(404).json({ message: "Request not found" });
+        }
+
+        if (![REQUEST_STATUS.OPEN, REQUEST_STATUS.ASSIGNED].includes(request.status)) {
+            return res.status(400).json({ message: "Request is not in a reservable state" });
+        }
+
+        // Verify all units belong to this organization and are available
+        const units = await BloodUnit.find({
+            _id: { $in: unitIds },
+            organizationId: org._id,
+            status: "AVAILABLE"
+        });
+
+        if (units.length !== unitIds.length) {
+            return res.status(400).json({
+                message: "Some units are not available or do not belong to your organization"
+            });
+        }
+
+        // Verify blood groups match
+        const mismatchedUnits = units.filter(unit => unit.bloodGroup !== request.bloodGroup);
+        if (mismatchedUnits.length > 0) {
+            return res.status(400).json({
+                message: "Some units do not match the requested blood group"
+            });
+        }
+
+        // Update units to RESERVED
+        await BloodUnit.updateMany(
+            { _id: { $in: unitIds } },
+            {
+                $set: {
+                    status: "RESERVED",
+                    reservedFor: request._id,
+                    reservedBy: org._id,
+                    reservedAt: new Date()
+                }
+            }
+        );
+
+        // Update request
+        request.reservedUnits = unitIds;
+        request.reservedBy = org._id;
+        request.reservedAt = new Date();
+        if (request.status === REQUEST_STATUS.OPEN) {
+            request.status = REQUEST_STATUS.ASSIGNED;
+        }
+        await request.save();
+
+        res.json({
+            message: "Units reserved successfully",
+            reservedCount: unitIds.length,
+            request: {
+                _id: request._id,
+                status: request.status,
+                reservedUnits: request.reservedUnits
+            }
+        });
+
+        // TODO: Send notification to hospital
+    } catch (error) {
+        console.error("Error reserving units:", error);
+        res.status(500).json({ message: "Failed to reserve units" });
+    }
+});
+
+/**
+ * POST /api/requests/org/:id/issue
+ * Issue reserved units to hospital (Blood Bank)
+ */
+router.post("/org/:id/issue", orgAuth, async (req, res) => {
+    try {
+        const { notes } = req.body;
+
+        // Get organization
+        const org = await User.findById(req.user.userId);
+        if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
+            return res.status(403).json({ message: "Only blood banks can issue units" });
+        }
+
+        // Get request with reserved units
+        const request = await Request.findById(req.params.id);
+        if (!request) {
+            return res.status(404).json({ message: "Request not found" });
+        }
+
+        if (!request.reservedUnits || request.reservedUnits.length === 0) {
+            return res.status(400).json({ message: "No units reserved for this request" });
+        }
+
+        if (request.reservedBy.toString() !== org._id.toString()) {
+            return res.status(403).json({ message: "Units were reserved by a different blood bank" });
+        }
+
+        // Update reserved units to ISSUED
+        await BloodUnit.updateMany(
+            { _id: { $in: request.reservedUnits } },
+            {
+                $set: {
+                    status: "ISSUED",
+                    issuedTo: request.organizationId,
+                    issuedAt: new Date(),
+                    issuedBy: org._id
+                }
+            }
+        );
+
+        // Mark request as FULFILLED
+        request.status = REQUEST_STATUS.FULFILLED;
+        request.fulfilledAt = new Date();
+        if (notes) request.notes = notes;
+        await request.save();
+
+        res.json({
+            message: "Units issued successfully",
+            issuedCount: request.reservedUnits.length,
+            request: {
+                _id: request._id,
+                status: request.status,
+                fulfilledAt: request.fulfilledAt
+            }
+        });
+
+        // TODO: Send notification to hospital
+    } catch (error) {
+        console.error("Error issuing units:", error);
+        res.status(500).json({ message: "Failed to issue units" });
+    }
+});
+
+/**
+ * DELETE /api/requests/org/:id/reserve
+ * Release/cancel reservation (Blood Bank)
+ */
+router.delete("/org/:id/reserve", orgAuth, async (req, res) => {
+    try {
+        const { unitIds } = req.body; // Optional: specific units to release, or all if not provided
+
+        // Get organization
+        const org = await User.findById(req.user.userId);
+        if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
+            return res.status(403).json({ message: "Only blood banks can release reservations" });
+        }
+
+        // Get request
+        const request = await Request.findById(req.params.id);
+        if (!request) {
+            return res.status(404).json({ message: "Request not found" });
+        }
+
+        if (request.reservedBy.toString() !== org._id.toString()) {
+            return res.status(403).json({ message: "Only the reserving blood bank can release units" });
+        }
+
+        const unitsToRelease = unitIds || request.reservedUnits;
+        if (!unitsToRelease || unitsToRelease.length === 0) {
+            return res.status(400).json({ message: "No units to release" });
+        }
+
+        // Update units back to AVAILABLE
+        await BloodUnit.updateMany(
+            {
+                _id: { $in: unitsToRelease },
+                status: "RESERVED",
+                reservedFor: request._id
+            },
+            {
+                $set: { status: "AVAILABLE" },
+                $unset: {
+                    reservedFor: "",
+                    reservedBy: "",
+                    reservedAt: ""
+                }
+            }
+        );
+
+        // Update request
+        if (unitIds) {
+            // Partial release
+            request.reservedUnits = request.reservedUnits.filter(
+                id => !unitIds.includes(id.toString())
+            );
+            if (request.reservedUnits.length === 0) {
+                request.reservedBy = undefined;
+                request.reservedAt = undefined;
+                request.status = REQUEST_STATUS.OPEN;
+            }
+        } else {
+            // Full release
+            request.reservedUnits = [];
+            request.reservedBy = undefined;
+            request.reservedAt = undefined;
+            request.status = REQUEST_STATUS.OPEN;
+        }
+
+        await request.save();
+
+        res.json({
+            message: "Reservation released successfully",
+            releasedCount: unitsToRelease.length,
+            request: {
+                _id: request._id,
+                status: request.status,
+                reservedUnits: request.reservedUnits
+            }
+        });
+    } catch (error) {
+        console.error("Error releasing reservation:", error);
+        res.status(500).json({ message: "Failed to release reservation" });
+    }
+});
+
 
 // ==================== ADMIN ENDPOINTS ====================
 

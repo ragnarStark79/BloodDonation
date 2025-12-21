@@ -58,7 +58,7 @@ const NearbyRequests = () => {
   const markInterest = async (id) => {
     try {
       await client.post(`/api/donor/requests/${id}/interest`);
-      setRequests((prev) => prev.map((r) => r._id === id ? { ...r, interested: true } : r));
+      setRequests((prev) => prev.map((r) => r._id === id ? { ...r, hasExpressedInterest: true } : r));
       toast.success("Interest recorded");
     } catch (err) {
       console.error(err);
@@ -177,13 +177,25 @@ const NearbyRequests = () => {
                   <p className="text-sm text-gray-500">{request.notes || "No additional notes"}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    className="px-3 py-1.5 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-60"
-                    onClick={() => markInterest(request._id)}
-                    disabled={!eligibleInfo.eligible || request.interested}
-                  >
-                    {request.interested ? "Interested" : "I can donate"}
-                  </button>
+                  {request.isAssignedToMe ? (
+                    <button
+                      className="px-3 py-1.5 text-sm font-semibold bg-emerald-500 text-white rounded-lg transition-all flex items-center gap-1"
+                      disabled
+                    >
+                      ✅ You're Assigned!
+                    </button>
+                  ) : (
+                    <button
+                      className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-all ${request.hasExpressedInterest
+                        ? 'bg-green-100 text-green-700 border border-green-300'
+                        : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
+                      onClick={() => !request.hasExpressedInterest && markInterest(request._id)}
+                      disabled={!eligibleInfo.eligible || request.hasExpressedInterest}
+                    >
+                      {request.hasExpressedInterest ? "Interested" : "I can donate"}
+                    </button>
+                  )}
                   <button
                     className="px-3 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50"
                     onClick={() => setSelected(request)}
@@ -205,7 +217,7 @@ const NearbyRequests = () => {
                   <AlertTriangle size={16} className="text-orange-500" />
                   <div>
                     <p className="text-xs text-gray-500">Units Needed</p>
-                    <p className="font-semibold">{request.units} units</p>
+                    <p className="font-semibold">{request.unitsNeeded || request.units || 0} units</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-gray-600">
@@ -256,7 +268,7 @@ const NearbyRequests = () => {
               </div>
               <div className="p-3 border rounded-lg">
                 <p className="text-xs text-gray-500">Units</p>
-                <p className="font-semibold text-gray-800">{selected.units}</p>
+                <p className="font-semibold text-gray-800">{selected.unitsNeeded || selected.units || 0}</p>
               </div>
               <div className="p-3 border rounded-lg">
                 <p className="text-xs text-gray-500">Urgency</p>
@@ -276,9 +288,9 @@ const NearbyRequests = () => {
               <button
                 className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-60"
                 onClick={() => { markInterest(selected._id); setSelected(null); }}
-                disabled={!eligibleInfo.eligible || selected.interested}
+                disabled={!eligibleInfo.eligible || selected.hasExpressedInterest}
               >
-                {selected.interested ? "Interested" : "I can donate"}
+                {selected.hasExpressedInterest ? "Interested" : "I can donate"}
               </button>
               <button
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold hover:bg-gray-50"

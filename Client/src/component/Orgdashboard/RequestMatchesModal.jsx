@@ -62,6 +62,7 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
             });
             toast.success('Donor assigned successfully! Appointment created.');
             onAssignSuccess();
+            onClose(); // Close modal after successful assignment
         } catch (error) {
             console.error('Failed to assign donor:', error);
             toast.error(error.response?.data?.message || 'Failed to assign donor');
@@ -83,6 +84,7 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
             });
             toast.success('Blood bank assigned! They will reserve and transfer the units.');
             onAssignSuccess();
+            onClose(); // Close modal after successful assignment
         } catch (error) {
             console.error('Failed to assign blood bank:', error);
             toast.error(error.response?.data?.message || 'Failed to assign blood bank');
@@ -134,16 +136,16 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
                             <button
                                 onClick={() => setActiveTab('donors')}
                                 className={`flex-1 px-6 py-4 font-semibold transition-colors relative ${activeTab === 'donors'
-                                        ? 'text-blue-600 bg-blue-50'
-                                        : 'text-gray-600 hover:bg-gray-50'
+                                    ? 'text-blue-600 bg-blue-50'
+                                    : 'text-gray-600 hover:bg-gray-50'
                                     }`}
                             >
                                 <div className="flex items-center justify-center gap-2">
                                     <Heart className="w-5 h-5" />
                                     <span>Interested Donors</span>
                                     <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'donors'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-200 text-gray-700'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 text-gray-700'
                                         }`}>
                                         {donorCount}
                                     </span>
@@ -155,16 +157,16 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
                             <button
                                 onClick={() => setActiveTab('bloodBanks')}
                                 className={`flex-1 px-6 py-4 font-semibold transition-colors relative ${activeTab === 'bloodBanks'
-                                        ? 'text-blue-600 bg-blue-50'
-                                        : 'text-gray-600 hover:bg-gray-50'
+                                    ? 'text-blue-600 bg-blue-50'
+                                    : 'text-gray-600 hover:bg-gray-50'
                                     }`}
                             >
                                 <div className="flex items-center justify-center gap-2">
                                     <Building2 className="w-5 h-5" />
                                     <span>Blood Banks</span>
                                     <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'bloodBanks'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-200 text-gray-700'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 text-gray-700'
                                         }`}>
                                         {bankCount}
                                     </span>
@@ -222,7 +224,7 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
 
                                                                 <div>
                                                                     <h3 className="text-lg font-semibold text-gray-900">
-                                                                        {donor.name}
+                                                                        {donor.Name || 'N/A'}
                                                                     </h3>
                                                                     <div className="flex items-center gap-3 mt-1">
                                                                         <div className="flex items-center gap-1 text-sm text-gray-600">
@@ -254,7 +256,7 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
                                                         <div className="grid grid-cols-2 gap-3 mb-4">
                                                             <div className="flex items-center gap-2 text-sm">
                                                                 <Phone className="w-4 h-4 text-gray-400" />
-                                                                <span className="text-gray-700">{donor.phone || 'Not provided'}</span>
+                                                                <span className="text-gray-700">{donor.PhoneNumber || 'Not provided'}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2 text-sm">
                                                                 <Calendar className="w-4 h-4 text-gray-400" />
@@ -269,24 +271,31 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
                                                             Expressed interest {calculateResponseTime(donor.interestedAt || donor.createdAt)} ago
                                                         </p>
 
-                                                        {/* Action */}
-                                                        <button
-                                                            onClick={() => handleAssignDonor(donor._id)}
-                                                            disabled={assigning === donor._id}
-                                                            className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                                        >
-                                                            {assigning === donor._id ? (
-                                                                <>
-                                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                                    Assigning...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <CheckCircle className="w-4 h-4" />
-                                                                    Assign Donor & Schedule Appointment
-                                                                </>
-                                                            )}
-                                                        </button>
+                                                        {/* Action - Check if this donor is already assigned */}
+                                                        {request.assignedTo?.donorId?.toString() === donor._id?.toString() ? (
+                                                            <div className="w-full px-4 py-2.5 bg-green-100 border-2 border-green-300 text-green-700 rounded-lg font-semibold flex items-center justify-center gap-2">
+                                                                <CheckCircle className="w-5 h-5" />
+                                                                Already Assigned
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleAssignDonor(donor._id)}
+                                                                disabled={assigning === donor._id || request.status === 'ASSIGNED'}
+                                                                className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                            >
+                                                                {assigning === donor._id ? (
+                                                                    <>
+                                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                                        Assigning...
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <CheckCircle className="w-4 h-4" />
+                                                                        Assign Donor & Schedule Appointment
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 );
                                             })
@@ -331,7 +340,7 @@ const RequestMatchesModal = ({ isOpen, request, onClose, onAssignSuccess }) => {
 
                                                                 <div>
                                                                     <h3 className="text-lg font-semibold text-gray-900">
-                                                                        {bank.name}
+                                                                        {bank.organizationName}
                                                                     </h3>
                                                                     <div className="flex items-center gap-3 mt-1">
                                                                         <div className="flex items-center gap-1 text-sm text-gray-600">

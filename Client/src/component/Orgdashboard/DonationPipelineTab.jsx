@@ -79,11 +79,47 @@ const DonationPipelineTab = () => {
 
     const fetchDonations = async () => {
         try {
-            const data = await adminApi.getDonations();
-            setDonationColumns(data);
+            // Fetch both appointments and existing donations
+            const [appointmentsData, donationsData] = await Promise.all([
+                orgApi.getAppointments(),
+                adminApi.getDonations().catch(() => ({ 'new-donors': { items: [] }, 'screening': { items: [] }, 'in-progress': { items: [] }, 'completed': { items: [] }, 'ready-storage': { items: [] } }))
+            ]);
+
+            // Convert UPCOMING appointments to NEW DONORS
+            const upcomingAppointments = (appointmentsData.appointments || [])
+                .filter(apt => apt.status === 'UPCOMING')
+                .map(apt => ({
+                    _id: apt._id,
+                    donorId: apt.donorId?._id || apt.donorId,
+                    donorName: apt.donorId?.Name || 'Unknown Donor',
+                    bloodGroup: apt.donorId?.bloodGroup || apt.bloodGroup || 'Unknown',
+                    phone: apt.donorId?.PhoneNumber || apt.donorId?.Phone || 'N/A',
+                    email: apt.donorId?.Email || 'N/A',
+                    appointmentDate: apt.dateTime,
+                    requestId: apt.requestId,
+                    notes: apt.notes || '',
+                    stage: 'new-donor',
+                    fromAppointment: true
+                }));
+
+            // Merge with existing donations data
+            const newColumns = {
+                'new-donors': {
+                    id: 'new-donors',
+                    title: 'NEW DONORS',
+                    color: 'from-red-50 to-red-100/50',
+                    items: [...upcomingAppointments, ...(donationsData['new-donors']?.items || [])]
+                },
+                'screening': donationsData['screening'] || { id: 'screening', title: 'SCREENING', color: 'from-blue-50 to-blue-100/50', items: [] },
+                'in-progress': donationsData['in-progress'] || { id: 'in-progress', title: 'IN PROGRESS', color: 'from-yellow-50 to-yellow-100/50', items: [] },
+                'completed': donationsData['completed'] || { id: 'completed', title: 'COMPLETED', color: 'from-green-50 to-green-100/50', items: [] },
+                'ready-storage': donationsData['ready-storage'] || { id: 'ready-storage', title: 'READY FOR STORAGE', color: 'from-purple-50 to-purple-100/50', items: [] }
+            };
+
+            setDonationColumns(newColumns);
         } catch (error) {
             console.error('Failed to fetch donations:', error);
-            toast.error('Failed to load donations');
+            toast.error('Failed to load donation pipeline');
         } finally {
             setLoading(false);
         }

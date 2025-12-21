@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar, Clock, MapPin, Plus, Loader2, X } from 'lucide-react';
 import LoadingSkeleton from '../common/LoadingSkeleton';
-import donorApi from '../../api/donorApi';
+import appointmentApi from '../../api/appointmentApi';
 import { toast } from 'sonner';
 import BookAppointmentModal from './BookAppointmentModal';
 
@@ -18,7 +18,7 @@ const Appointments = () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await donorApi.getAppointments('UPCOMING');
+            const data = await appointmentApi.getMyAppointments('UPCOMING');
             setAppointments(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error('Failed to load appointments:', err);
@@ -32,12 +32,13 @@ const Appointments = () => {
         fetchAppointments();
     }, []);
 
+
     const handleCancel = async () => {
         if (!cancelModal) return;
 
         try {
             setCancelling(true);
-            await donorApi.cancelAppointment(cancelModal._id, cancelReason);
+            await appointmentApi.cancelAppointment(cancelModal._id, cancelReason);
             toast.success('Appointment cancelled successfully');
             setCancelModal(null);
             setCancelReason('');

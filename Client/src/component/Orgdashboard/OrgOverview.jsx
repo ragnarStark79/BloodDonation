@@ -93,7 +93,7 @@ const RequestCard = ({ request, onClick }) => {
                 </span>
             </div>
             <div className="text-sm text-gray-600 space-y-1">
-                <p><strong>Units:</strong> {request.units}</p>
+                <p><strong>Units:</strong> {request.unitsNeeded || request.units || 0}</p>
                 <p><strong>Status:</strong> {request.status}</p>
                 {request.caseId && <p className="text-xs text-gray-500">Case: {request.caseId}</p>}
                 {request.createdBy?.organizationName && (

@@ -33,11 +33,16 @@ router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
     const bloodGroup = group || user.bloodGroup || user.Bloodgroup; // Fallback to user group
     console.log(`[DonorAPI] Searching for bloodGroup: ${bloodGroup}`);
 
-    // Build base query
+    // Build base query - only filter by blood group if explicitly requested
+    // Show OPEN requests and ASSIGNED requests (so donors can see what they're assigned to)
     const query = {
-      status: REQUEST_STATUS.OPEN,
-      bloodGroup, // Match user's blood group
+      status: { $in: [REQUEST_STATUS.OPEN, REQUEST_STATUS.ASSIGNED] }
     };
+
+    // Only filter by blood group if group parameter was explicitly provided
+    if (group) {
+      query.bloodGroup = group;
+    }
 
     if (urgency) query.urgency = urgency;
 
@@ -45,21 +50,45 @@ router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
 
     // If lat/lng provided, do geospatial search
     if (lat && lng) {
-      query.locationGeo = {
+      query.location = {
         $near: {
           $geometry: { type: "Point", coordinates: [Number(lng), Number(lat)] },
           $maxDistance: Number(km) * 1000,
         },
       };
-      requests = await Request.find(query).limit(50).lean();
+      requests = await Request.find(query)
+        .populate("organizationId", "organizationName Name")
+        .limit(50)
+        .lean();
+
+      // Filter out orphaned requests and add interest tracking
+      requests = requests
+        .filter(req => req.organizationId != null)
+        .map(req => ({
+          ...req,
+          hasExpressedInterest: req.interestedDonors?.some(d => d.toString() === user._id.toString()) || false,
+          isAssignedToMe: req.assignedTo?.donorId?.toString() === user._id.toString() || false
+        }));
+
       console.log(`[DonorAPI] Found ${requests.length} requests with geolocation`);
     } else {
       // Otherwise just return by blood group (no distance filtering)
       console.log(`[DonorAPI] No location provided, returning all matching blood group requests`);
       requests = await Request.find(query)
+        .populate("organizationId", "organizationName Name") // Populate to check if exists
         .sort({ urgency: -1, createdAt: -1 })
         .limit(50)
         .lean();
+
+      // Filter out orphaned requests and add interest tracking
+      requests = requests
+        .filter(req => req.organizationId != null)
+        .map(req => ({
+          ...req,
+          hasExpressedInterest: req.interestedDonors?.some(d => d.toString() === user._id.toString()) || false,
+          isAssignedToMe: req.assignedTo?.donorId?.toString() === user._id.toString() || false
+        }));
+
       console.log(`[DonorAPI] Found ${requests.length} requests by blood group only`);
     }
 

@@ -885,15 +885,48 @@ router.delete("/users/:id", auth([ROLES.ADMIN]), async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // CASCADE DELETE: Remove all related data for this user
+    const deletedItems = {
+      requests: 0,
+      appointments: 0,
+      bloodUnits: 0
+    };
+
+    // Delete all blood requests created by this organization
+    if (user.Role === ROLES.ORGANIZATION || user.Role === "organization") {
+      const requestsResult = await Request.deleteMany({ organizationId: req.params.id });
+      deletedItems.requests = requestsResult.deletedCount || 0;
+
+      // Delete all blood units from this organization's inventory
+      const unitsResult = await BloodUnit.deleteMany({ organizationId: req.params.id });
+      deletedItems.bloodUnits = unitsResult.deletedCount || 0;
+    }
+
+    // Delete all appointments related to this user (donor or organization)
+    const appointmentsResult = await Appointment.deleteMany({
+      $or: [
+        { donorId: req.params.id },
+        { organizationId: req.params.id }
+      ]
+    });
+    deletedItems.appointments = appointmentsResult.deletedCount || 0;
+
     await logAction({
       adminId: req.user.userId,
       action: "USER_DELETE",
       targetId: user._id,
       targetType: "User",
-      details: { deletedUser: { name: user.Name, email: user.Email, role: user.Role } },
+      details: {
+        deletedUser: { name: user.Name, email: user.Email, role: user.Role },
+        cascadeDeleted: deletedItems
+      },
     });
 
-    res.json({ message: "User deleted successfully", user });
+    res.json({
+      message: "User deleted successfully",
+      user,
+      cascadeDeleted: deletedItems
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });

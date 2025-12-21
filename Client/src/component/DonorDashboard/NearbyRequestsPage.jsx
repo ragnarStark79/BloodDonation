@@ -26,6 +26,12 @@ const NearbyRequestsPage = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [interestedRequests, setInterestedRequests] = useState(new Set());
 
+    // Geolocation state
+    const [userLocation, setUserLocation] = useState(null);
+    const [locationError, setLocationError] = useState(null);
+    const [useLocation, setUseLocation] = useState(true);
+    const [distanceKm, setDistanceKm] = useState(10);
+
     // Filters
     const [filters, setFilters] = useState({
         bloodGroup: '',
@@ -37,6 +43,32 @@ const NearbyRequestsPage = () => {
     // Pagination
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
+
+    // Get user's geolocation
+    useEffect(() => {
+        if (useLocation && !userLocation) {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        setUserLocation({
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        });
+                        setLocationError(null);
+                        toast.success('Location access granted');
+                    },
+                    (error) => {
+                        console.error('Geolocation error:', error);
+                        setLocationError(error.message);
+                        toast.error('Unable to access location');
+                    }
+                );
+            } else {
+                setLocationError('Geolocation not supported');
+                toast.error('Browser does not support geolocation');
+            }
+        }
+    }, [useLocation, userLocation]);
 
     // Fetch nearby requests
     const fetchRequests = async (isRefresh = false) => {
@@ -51,7 +83,13 @@ const NearbyRequestsPage = () => {
                 page: isRefresh ? 1 : page,
                 limit: 10,
                 ...(filters.bloodGroup && { bloodGroup: filters.bloodGroup }),
-                ...(filters.urgency && { urgency: filters.urgency })
+                ...(filters.urgency && { urgency: filters.urgency }),
+                // Add location params if available
+                ...(useLocation && userLocation && {
+                    lat: userLocation.lat,
+                    lng: userLocation.lng,
+                    km: distanceKm
+                })
             };
 
             const response = await requestApi.getNearbyRequests(params);
@@ -76,7 +114,7 @@ const NearbyRequestsPage = () => {
 
     useEffect(() => {
         fetchRequests();
-    }, [page, filters.bloodGroup, filters.urgency]);
+    }, [page, filters.bloodGroup, filters.urgency, userLocation, useLocation, distanceKm]);
 
     const handleExpressInterest = async (requestId) => {
         try {
@@ -160,8 +198,8 @@ const NearbyRequestsPage = () => {
                     <button
                         onClick={() => setShowFilters(!showFilters)}
                         className={`px-4 py-3 border rounded-lg flex items-center gap-2 transition-colors ${showFilters || activeFiltersCount > 0
-                                ? 'bg-red-50 border-red-300 text-red-700'
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            ? 'bg-red-50 border-red-300 text-red-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                             }`}
                     >
                         <Filter className="w-5 h-5" />
@@ -177,7 +215,7 @@ const NearbyRequestsPage = () => {
                 {/* Filter Panel */}
                 {showFilters && (
                     <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Blood Group
@@ -208,14 +246,51 @@ const NearbyRequestsPage = () => {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex items-end">
-                                <button
-                                    onClick={clearFilters}
-                                    className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Distance
+                                </label>
+                                <select
+                                    value={distanceKm}
+                                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                                    disabled={!useLocation}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:opacity-50 disabled:bg-gray-100"
                                 >
-                                    Clear Filters
-                                </button>
+                                    <option value="5">5 km</option>
+                                    <option value="10">10 km</option>
+                                    <option value="20">20 km</option>
+                                    <option value="50">50 km</option>
+                                    <option value="100">100 km</option>
+                                </select>
                             </div>
+                            <div className="flex items-end">
+                                <label className="flex items-center gap-2 cursor-pointer px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors w-full justify-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={useLocation}
+                                        onChange={(e) => setUseLocation(e.target.checked)}
+                                        className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                    />
+                                    <MapPin className="w-4 h-4" />
+                                    <span className="text-sm font-medium text-gray-700">
+                                        Location {userLocation && '✓'}
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        <div className="mt-4 flex justify-between items-center">
+                            <button
+                                onClick={clearFilters}
+                                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                                Clear Filters
+                            </button>
+                            {locationError && (
+                                <p className="text-sm text-red-600 flex items-center gap-1">
+                                    <AlertCircle className="w-4 h-4" />
+                                    {locationError}
+                                </p>
+                            )}
                         </div>
                     </div>
                 )}

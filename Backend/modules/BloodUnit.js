@@ -9,6 +9,16 @@ const bloodUnitSchema = new mongoose.Schema(
     expiryDate: { type: Date, required: true },
     status: { type: String, enum: ["AVAILABLE", "RESERVED", "ISSUED", "EXPIRED"], default: "AVAILABLE" },
     barcode: { type: String },
+
+    // Reservation tracking
+    reservedFor: { type: mongoose.Schema.Types.ObjectId, ref: "Request" },
+    reservedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    reservedAt: { type: Date },
+
+    // Issue tracking
+    issuedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    issuedAt: { type: Date },
+    issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

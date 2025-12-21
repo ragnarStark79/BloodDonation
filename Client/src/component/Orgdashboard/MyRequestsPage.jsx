@@ -196,8 +196,8 @@ const MyRequestsPage = () => {
                     <button
                         onClick={() => setShowFilters(!showFilters)}
                         className={`px-4 py-3 border rounded-lg flex items-center gap-2 transition-colors ${showFilters || activeFiltersCount > 0
-                                ? 'bg-red-50 border-red-300 text-red-700'
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            ? 'bg-red-50 border-red-300 text-red-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                             }`}
                     >
                         <Filter className="w-5 h-5" />
@@ -359,10 +359,22 @@ const MyRequestsPage = () => {
                                             <>
                                                 <button
                                                     onClick={() => handleViewMatches(request)}
-                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                                    className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 ${request.status === REQUEST_STATUS.ASSIGNED
+                                                            ? 'bg-purple-600 hover:bg-purple-700'
+                                                            : 'bg-blue-600 hover:bg-blue-700'
+                                                        }`}
                                                 >
-                                                    <Users className="w-4 h-4" />
-                                                    View Matches
+                                                    {request.status === REQUEST_STATUS.ASSIGNED ? (
+                                                        <>
+                                                            <CheckCircle className="w-4 h-4" />
+                                                            View Assigned Donor
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Users className="w-4 h-4" />
+                                                            View Matches
+                                                        </>
+                                                    )}
                                                 </button>
                                                 <button
                                                     onClick={() => handleFulfillRequest(request._id)}

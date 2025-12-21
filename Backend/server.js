@@ -17,6 +17,7 @@ import healthRoutes from "./Router/health.js";
 import notificationRoutes from "./Router/notification.js";
 import requestRoutes from "./Router/requests-complete.js";
 import donationRoutes from "./Router/donation.js";
+import appointmentRoutes from "./Router/appointments.js";
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use("/api/admin/donations", donationRoutes); // More specific route first
 app.use("/api/admin", adminRoutes);
 app.use("/api/geo", geoRoutes);
 app.use("/api/requests", requestRoutes);
+app.use("/api/appointments", appointmentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/health", (req, res) => res.status(200).json({ status: "OK" })); // Quick health check
 // app.use("/health", healthRoutes); // Disabling external healthRoutes file for now to be simple

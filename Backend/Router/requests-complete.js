@@ -46,9 +46,13 @@ router.get("/nearby", authenticate, requireRole(ROLES.DONOR), async (req, res) =
         }
 
         const query = {
-            status: { $in: [REQUEST_STATUS.OPEN, REQUEST_STATUS.ASSIGNED] },
-            bloodGroup: bloodGroup || donor.bloodGroup
+            status: { $in: [REQUEST_STATUS.OPEN, REQUEST_STATUS.ASSIGNED] }
         };
+
+        // Only filter by blood group if explicitly requested
+        if (bloodGroup) {
+            query.bloodGroup = bloodGroup;
+        }
 
         if (urgency && urgency !== "ALL") {
             query.urgency = urgency;
@@ -109,6 +113,10 @@ router.get("/nearby", authenticate, requireRole(ROLES.DONOR), async (req, res) =
                 .skip((page - 1) * limit)
                 .limit(parseInt(limit))
                 .lean();
+
+
+            // Filter out orphaned requests (where organization was deleted)
+            requests = requests.filter(req => req.organizationId != null);
 
             requests = requests.map(req => ({
                 ...req,
@@ -330,7 +338,7 @@ router.get("/org/mine", authenticate, requireRole(ROLES.ORGANIZATION), async (re
  */
 router.get("/org/:id/matches", authenticate, requireRole(ROLES.ORGANIZATION), async (req, res) => {
     try {
-        const request = await Request.findById(req.params.id).populate("interestedDonors", "name phone bloodGroup location");
+        const request = await Request.findById(req.params.id).populate("interestedDonors", "Name PhoneNumber Email bloodGroup City State location lastDonationDate eligible");
 
         if (!request) {
             return res.status(404).json({ message: "Request not found" });

@@ -159,7 +159,7 @@ const GoogleMapWidget = () => {
 
                     {/* Blood request markers */}
                     {requests.map((request) => {
-                        const [lng, lat] = request.locationGeo?.coordinates || [];
+                        const [lng, lat] = request.location?.coordinates || [];
                         if (!lat || !lng) return null;
 
                         const position = { lat, lng };
@@ -186,7 +186,7 @@ const GoogleMapWidget = () => {
 
                     {/* Info Window for selected request */}
                     {selectedRequest && (() => {
-                        const [lng, lat] = selectedRequest.locationGeo?.coordinates || [];
+                        const [lng, lat] = selectedRequest.location?.coordinates || [];
                         if (!lat || !lng) return null;
 
                         return (
@@ -207,7 +207,7 @@ const GoogleMapWidget = () => {
                                             </span>
                                         </p>
                                         <p>
-                                            <span className="font-medium">Units Needed:</span> {selectedRequest.units}
+                                            <span className="font-medium">Units Needed:</span> {selectedRequest.unitsNeeded || selectedRequest.units || 0}
                                         </p>
                                         <p>
                                             <span className="font-medium">Urgency:</span>{' '}

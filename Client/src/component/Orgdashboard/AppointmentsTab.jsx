@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import appointmentApi from "../../api/appointmentApi";
 import orgApi from "../../api/orgApi";
 import { toast } from "sonner";
 import {
@@ -34,8 +35,8 @@ const AppointmentsTab = () => {
     const fetchAppointments = async () => {
         setLoading(true);
         try {
-            const res = await orgApi.getAppointments();
-            setAppointments(res || []);
+            const res = await appointmentApi.getOrgAppointments({ status: 'UPCOMING' });
+            setAppointments(res.appointments || res || []);
         } catch (err) {
             console.error(err);
             toast.error("Failed to load appointments");
@@ -80,12 +81,13 @@ const AppointmentsTab = () => {
         }
     };
 
+
     const handleComplete = async (e) => {
         e.preventDefault();
         if (!selected) return;
 
         try {
-            await orgApi.completeAppointment(selected._id, completeForm);
+            await appointmentApi.completeAppointment(selected._id, completeForm);
             toast.success("Donation recorded successfully");
             setSelected(null);
             fetchAppointments();
