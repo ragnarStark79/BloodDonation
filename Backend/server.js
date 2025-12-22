@@ -42,6 +42,7 @@ app.use(["/api/login", "/api/signup"], authLimiter);
 
 connectdb();
 
+// api health
 app.get("/api/health", (req, res) => {
     res.status(200).json({ status: "OK" });
 })
@@ -57,7 +58,6 @@ app.use("/api/geo", geoRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/notifications", notificationRoutes);
-app.use("/health", (req, res) => res.status(200).json({ status: "OK" })); // Quick health check
 // app.use("/health", healthRoutes); // Disabling external healthRoutes file for now to be simple
 
 // Fallback 404

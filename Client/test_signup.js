@@ -14,7 +14,6 @@ const signupHospital = async () => {
             Department: "ER",
             HospitalAddress: "123 Medical Way"
         });
-        console.log("Signup Success:", response.data);
     } catch (error) {
         if (error.response) {
             console.error("Signup Failed:", error.response.status, error.response.data);
