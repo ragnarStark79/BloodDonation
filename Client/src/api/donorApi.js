@@ -117,6 +117,38 @@ export const donorApi = {
         const res = await client.post("/api/donor/profile-update", data);
         return res.data;
     },
+
+    /**
+     * Get available donation camps
+     */
+    getCamps: async (params) => {
+        const res = await client.get("/api/donor/camps", { params });
+        return res.data;
+    },
+
+    /**
+     * Register for a camp
+     */
+    registerForCamp: async (campId) => {
+        const res = await client.post(`/api/donor/camps/${campId}/register`);
+        return res.data;
+    },
+
+    /**
+     * Unregister from a camp
+     */
+    unregisterFromCamp: async (campId) => {
+        const res = await client.delete(`/api/donor/camps/${campId}/unregister`);
+        return res.data;
+    },
+
+    /**
+     * Get registered camps for the current donor
+     */
+    getMyCamps: async () => {
+        const res = await client.get("/api/donor/my-camps");
+        return res.data;
+    }
 };
 
 export default donorApi;

@@ -38,7 +38,6 @@ export const BLOOD_GROUPS = [
 
 export const ORG_TYPES = {
   HOSPITAL: "HOSPITAL",
-  BLOOD_BANK: "BANK",
-  BOTH: "BOTH"
+  BLOOD_BANK: "BANK"
 };
 

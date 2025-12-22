@@ -82,38 +82,67 @@ const AddInventory = ({ onAdded }) => {
     try {
       setLoading(true);
 
+      const quantity = parseInt(form.quantity) || 1;
+      console.log(`🔄 Starting bulk add: ${quantity} units`);
+
       // Create multiple units
       const createdUnits = [];
+      const errors = [];
+
       for (let i = 0; i < quantity; i++) {
-        const barcode = form.barcode && quantity === 1
-          ? form.barcode
-          : generateBarcode(); // Auto-generate unique barcode for each unit
+        try {
+          const barcode = form.barcode && quantity === 1
+            ? form.barcode
+            : generateBarcode(); // Auto-generate unique barcode for each unit
 
-        const res = await client.post("/api/org/inventory", {
-          group: form.group,
-          component: form.component,
-          collectionDate: form.collectionDate,
-          expiryDate: form.expiryDate,
-          barcode: barcode,
-        });
-        createdUnits.push(res.data);
+          console.log(`📦 Creating unit ${i + 1}/${quantity} with barcode: ${barcode}`);
 
-        // Small delay to ensure unique timestamps for barcodes
-        if (i < quantity - 1) {
-          await new Promise(resolve => setTimeout(resolve, 10));
+          const res = await client.post("/api/org/inventory", {
+            group: form.group,
+            component: form.component,
+            collectionDate: form.collectionDate,
+            expiryDate: form.expiryDate,
+            barcode: barcode,
+          });
+
+          createdUnits.push(res.data);
+          console.log(`✅ Unit ${i + 1}/${quantity} created successfully:`, res.data._id);
+
+          // Small delay to ensure unique timestamps for barcodes
+          if (i < quantity - 1) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        } catch (unitError) {
+          console.error(`❌ Failed to create unit ${i + 1}/${quantity}:`, unitError);
+          errors.push({ index: i + 1, error: unitError.response?.data?.message || unitError.message });
         }
       }
 
-      setForm({ group: "", component: "WB", collectionDate: "", expiryDate: "", barcode: "", quantity: 1 });
+      console.log(`📊 Bulk add complete: ${createdUnits.length}/${quantity} units created successfully`);
 
-      // Notify parent for each unit
-      if (onAdded) {
-        createdUnits.forEach(unit => onAdded(unit));
+      // Clear form only if at least one unit was created
+      if (createdUnits.length > 0) {
+        setForm({ group: "", component: "WB", collectionDate: "", expiryDate: "", barcode: "", quantity: 1 });
+
+        // Notify parent ONCE with all created units
+        if (onAdded) {
+          console.log(`🔔 Notifying parent of ${createdUnits.length} new units`);
+          // Call onAdded once with all units
+          onAdded(createdUnits);
+        }
       }
 
-      toast.success(`${quantity} blood unit${quantity > 1 ? 's' : ''} added successfully!`);
+      // Show appropriate success/error message
+      if (errors.length === 0) {
+        toast.success(`${quantity} blood unit${quantity > 1 ? 's' : ''} added successfully!`);
+      } else if (createdUnits.length > 0) {
+        toast.warning(`${createdUnits.length}/${quantity} units added. ${errors.length} failed.`);
+      } else {
+        toast.error(`Failed to add units. Please try again.`);
+      }
+
     } catch (err) {
-      console.error(err);
+      console.error('Bulk add error:', err);
       toast.error(err.response?.data?.message || "Failed to add inventory");
     } finally {
       setLoading(false);

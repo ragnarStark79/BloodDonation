@@ -101,7 +101,7 @@ router.post("/signup", async (req, res) => {
     } else if (canonical === ROLES.ORGANIZATION) {
       // Handle new unified organization signup
       if (organizationType && organizationName) {
-        userData.organizationType = organizationType; // HOSPITAL, BANK, or BOTH
+        userData.organizationType = organizationType; // HOSPITAL or BANK
         userData.organizationName = organizationName;
         userData.licenseNo = Licensenumber;
       } else {

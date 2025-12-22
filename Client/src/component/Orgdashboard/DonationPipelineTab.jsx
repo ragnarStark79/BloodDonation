@@ -79,77 +79,134 @@ const DonationPipelineTab = () => {
 
     const fetchDonations = async () => {
         try {
-            // Fetch both appointments and existing donations
-            const [appointmentsData, donationsData] = await Promise.all([
+            // Fetch appointments, existing donations, and camp participants
+            const [appointmentsData, donationsData, campParticipants] = await Promise.all([
                 orgApi.getAppointments(),
-                adminApi.getDonations().catch(() => ({ 'new-donors': { items: [] }, 'screening': { items: [] }, 'in-progress': { items: [] }, 'completed': { items: [] }, 'ready-storage': { items: [] } }))
+                adminApi.getDonations().catch(() => ({ 'new-donors': { items: [] }, 'screening': { items: [] }, 'in-progress': { items: [] }, 'completed': { items: [] }, 'ready-storage': { items: [] } })),
+                orgApi.getCampParticipants().catch(() => [])
             ]);
 
             console.log('Raw appointments data:', appointmentsData);
+            console.log('Camp participants:', campParticipants);
 
-            // Handle both response formats: { appointments: [...] } or [...]
+            // Handle both response formats for appointments
             const appointmentsArray = Array.isArray(appointmentsData)
                 ? appointmentsData
                 : (appointmentsData.appointments || []);
 
-            console.log('Appointments array:', appointmentsArray);
-            console.log('First appointment:', appointmentsArray[0]);
+            console.log('Processed appointments array:', appointmentsArray);
 
-            // Collect all appointmentIds that already have donations
-            const existingAppointmentIds = new Set();
-            Object.values(donationsData).forEach(stage => {
-                if (stage.items) {
+            console.log('Processed appointments array length:', appointmentsArray.length);
+            console.log('Donations data response:', donationsData);
+
+            // Collect all ids that already have donations to avoid duplicates
+            // Handle both grouped object and flat array (though backend returns grouped)
+            const existingDonationIds = new Set();
+
+            const donationsByStage = Array.isArray(donationsData) ?
+                donationsData.reduce((acc, d) => {
+                    const st = d.stage || 'new-donors';
+                    if (!acc[st]) acc[st] = { id: st, items: [] };
+                    acc[st].items.push(d);
+                    return acc;
+                }, {}) : donationsData;
+
+            Object.values(donationsByStage || {}).forEach(stage => {
+                if (stage && stage.items) {
                     stage.items.forEach(item => {
-                        if (item.appointmentId) {
-                            existingAppointmentIds.add(item.appointmentId.toString());
-                        }
+                        if (item.appointmentId) existingDonationIds.add(item.appointmentId.toString());
+                        if (item.campParticipantId) existingDonationIds.add(item.campParticipantId);
                     });
                 }
             });
 
-            console.log('Existing appointment IDs with donations:', Array.from(existingAppointmentIds));
+            console.log('Existing donation IDs count:', existingDonationIds.size);
 
-            // Convert UPCOMING appointments to NEW DONORS, but exclude ones that already have donations
+            // Convert UPCOMING appointments to NEW DONORS
+            // User feedback: "user will come in new donar when time is 9"
+            // We only show them once the appointment time has arrived or passed
             const upcomingAppointments = appointmentsArray
-                .filter(apt => apt.status === 'UPCOMING')
-                .filter(apt => !existingAppointmentIds.has(apt._id.toString())) // DEDUPLICATION: Skip appointments that already have donations
-                .map(apt => {
-                    console.log('Processing appointment:', apt);
-                    console.log('Donor data:', apt.donorId);
+                .filter(apt => {
+                    const status = (apt.status || '').toUpperCase();
+                    const isUpcoming = status === 'UPCOMING';
+                    const aptId = apt._id?.toString() || apt.id?.toString();
+                    const notExisting = !existingDonationIds.has(aptId);
 
-                    return {
-                        id: apt._id, // DonorDetailsModal expects 'id' not  '_id'
-                        _id: apt._id,
-                        donorId: apt.donorId?._id || apt.donorId,
-                        name: apt.donorId?.Name || 'Unknown Donor', // DonorDetailsModal expects 'name' not 'donorName'
-                        group: apt.donorId?.bloodGroup || apt.bloodGroup || 'Unknown', // DonorDetailsModal expects 'group' not 'bloodGroup'
-                        phone: apt.donorId?.PhoneNumber || apt.donorId?.phone || 'Not provided',
-                        email: apt.donorId?.Email || apt.donorId?.email || 'Not provided',
-                        date: apt.dateTime || apt.createdAt || new Date(), // DonorDetailsModal expects 'date'
-                        appointmentDate: apt.dateTime,
-                        requestId: apt.requestId,
-                        notes: apt.notes || `Created from appointment on ${new Date(apt.dateTime || Date.now()).toLocaleDateString()}`,
-                        stage: 'new-donors', // Changed from 'new-donor' to 'new-donors' to match column ID
-                        status: 'Active',
-                        appointmentId: apt._id,
-                        fromAppointment: true
-                    };
-                });
+                    const apptTime = new Date(apt.dateTime);
+                    const isArrived = apptTime <= new Date();
 
-            console.log(`Filtered appointments: ${upcomingAppointments.length} (excluded ${existingAppointmentIds.size} with existing donations)`);
+                    console.log(`🔍 Filtering Appt ${aptId}: status=${status}, isUpcoming=${isUpcoming}, notExisting=${notExisting}, isArrived=${isArrived}, donor=${apt.donorId?.Name}`);
 
-            // Merge with existing donations data
+                    if (notExisting && isUpcoming && !isArrived) {
+                        console.log(`ℹ️ Appt ${aptId} (${apt.donorId?.Name}) scheduled for ${apptTime.toLocaleTimeString()} - will appear in NEW DONORS when the time comes.`);
+                    }
+
+                    return isUpcoming && notExisting && isArrived;
+                })
+                .map(apt => ({
+                    id: apt._id || apt.id,
+                    _id: apt._id || apt.id,
+                    donorId: apt.donorId?._id || apt.donorId,
+                    name: apt.donorId?.Name || 'Unknown Donor',
+                    group: apt.donorId?.bloodGroup || apt.bloodGroup || 'Unknown',
+                    phone: apt.donorId?.PhoneNumber || apt.donorId?.Phone || apt.donorId?.phone || 'Not provided',
+                    email: apt.donorId?.Email || apt.donorId?.email || 'Not provided',
+                    date: apt.dateTime || apt.createdAt || new Date(),
+                    appointmentDate: apt.dateTime,
+                    isToday: new Date(apt.dateTime).toDateString() === new Date().toDateString(),
+                    requestId: apt.requestId?._id || apt.requestId,
+                    notes: apt.notes || `Appointment on ${new Date(apt.dateTime || Date.now()).toLocaleDateString()}`,
+                    stage: 'new-donors',
+                    status: 'Active',
+                    appointmentId: apt._id || apt.id,
+                    fromAppointment: true
+                }));
+
+            console.log('Filtered upcoming appointments for pipeline:', upcomingAppointments.length);
+
+            // Convert Camp Participants to NEW DONORS
+            const campItems = (campParticipants || [])
+                .filter(p => !existingDonationIds.has(`${p._id}_${p.campId}`))
+                .map(p => ({
+                    id: `${p._id}_${p.campId}`,
+                    donorId: p._id,
+                    name: p.Name,
+                    group: p.bloodGroup,
+                    phone: p.PhoneNumber || 'Not provided',
+                    email: p.Email,
+                    date: new Date(),
+                    isToday: true,
+                    notes: `From Camp: ${p.campTitle}`,
+                    stage: 'new-donors',
+                    status: 'Active',
+                    campParticipantId: `${p._id}_${p.campId}`,
+                    campId: p.campId,
+                    fromCamp: true,
+                    isAttended: p.isAttended
+                }));
+
+            // Add isToday flag to all existing donations from backend
+            Object.keys(donationsByStage).forEach(stage => {
+                if (donationsByStage[stage].items) {
+                    donationsByStage[stage].items = donationsByStage[stage].items.map(item => ({
+                        ...item,
+                        isToday: item.date ? new Date(item.date).toDateString() === new Date().toDateString() : false
+                    }));
+                }
+            });
+
+            // Merge everything into columns
             const newColumns = {
                 'new-donors': {
                     id: 'new-donors',
                     title: 'NEW DONORS',
                     color: 'from-red-50 to-red-100/50',
-                    items: [...upcomingAppointments, ...(donationsData['new-donors']?.items || [])]
+                    items: [...upcomingAppointments, ...campItems, ...(donationsByStage['new-donors']?.items || [])]
                 },
-                'screening': donationsData['screening'] || { id: 'screening', title: 'SCREENING', color: 'from-blue-50 to-blue-100/50', items: [] },
-                'in-progress': donationsData['in-progress'] || { id: 'in-progress', title: 'IN PROGRESS', color: 'from-yellow-50 to-yellow-100/50', items: [] },
-                'completed': donationsData['completed'] || { id: 'completed', title: 'COMPLETED', color: 'from-green-50 to-green-100/50', items: [] },
-                'ready-storage': { id: 'ready-storage', title: 'READY FOR STORAGE', color: 'from-purple-50 to-purple-100/50', items: [] } // Column visible but donations go to inventory
+                'screening': donationsByStage['screening'] || { id: 'screening', title: 'SCREENING', color: 'from-blue-50 to-blue-100/50', items: [] },
+                'in-progress': donationsByStage['in-progress'] || { id: 'in-progress', title: 'IN PROGRESS', color: 'from-yellow-50 to-yellow-100/50', items: [] },
+                'completed': donationsByStage['completed'] || { id: 'completed', title: 'COMPLETED', color: 'from-green-50 to-green-100/50', items: [] },
+                'ready-storage': donationsByStage['ready-storage'] || { id: 'ready-storage', title: 'READY FOR STORAGE', color: 'from-purple-50 to-purple-100/50', items: [] }
             };
 
             setDonationColumns(newColumns);
@@ -380,48 +437,45 @@ const DonationPipelineTab = () => {
         try {
             const movedItem = sourceCol.items[source.index];
 
-            // Check if this is an appointment being moved (from NEW DONORS)
-            if (movedItem.fromAppointment && source.droppableId === 'new-donors') {
-                console.log('Moving appointment to donation pipeline, creating donation first...');
+            // Check if this is an appointment or camp participant being moved (from NEW DONORS)
+            if ((movedItem.fromAppointment || movedItem.fromCamp) && source.droppableId === 'new-donors') {
+                console.log(`Moving ${movedItem.fromCamp ? 'camp participant' : 'appointment'} to donation pipeline, creating donation first...`);
 
-                // Create a donation record from the appointment
+                // Create a donation record
                 const donationData = {
                     donorName: movedItem.name,
                     bloodGroup: movedItem.group,
                     phone: movedItem.phone,
                     email: movedItem.email,
                     notes: movedItem.notes,
-                    appointmentId: movedItem.appointmentId || movedItem._id,
-                    organizationId: user._id
+                    organizationId: user._id || user.userId
                 };
+
+                if (movedItem.fromAppointment) {
+                    donationData.appointmentId = movedItem.appointmentId || movedItem._id;
+                    donationData.donorId = movedItem.donorId;
+                } else if (movedItem.fromCamp) {
+                    donationData.campId = movedItem.campId;
+                    donationData.campParticipantId = movedItem.campParticipantId;
+                    donationData.donorId = movedItem.donorId;
+                }
 
                 try {
                     const newDonation = await adminApi.createDonation(donationData);
-                    console.log('Created donation response:', newDonation);
-                    console.log('Response keys:', Object.keys(newDonation));
-
-                    // Extract donation ID safely - API returns {_id: ..., donation: {...}} format
                     const donationId = newDonation._id || newDonation.donation?._id || newDonation.donation?.id || newDonation.id;
-                    console.log('Extracted donation ID:', donationId);
 
-                    if (!donationId) {
-                        console.error('No donation ID in response:', newDonation);
-                        throw new Error('Donation created but no ID returned from API');
-                    }
+                    if (!donationId) throw new Error('Donation created but no ID returned');
 
                     // Now update the donation stage to destination
-                    await adminApi.updateDonationStage(donationId, destination.droppableId, user._id);
+                    await adminApi.updateDonationStage(donationId, destination.droppableId, user._id || user.userId);
                     toast.success(`Moved to ${destCol.title}`);
                 } catch (createError) {
-                    // Check if this is a duplicate error
                     if (createError.response?.status === 400 && createError.response?.data?.message?.includes('already exists')) {
-                        console.log('Donation already exists for this appointment, fetching to sync...');
-                        toast.info('Donation already exists for this appointment');
-                        // Refresh to get the correct state
+                        toast.info('Donation already exists, syncing...');
                         await fetchDonations();
                         return;
                     }
-                    throw createError; // Re-throw if not a duplicate error
+                    throw createError;
                 }
             } else {
                 // Regular donation move
@@ -558,9 +612,19 @@ const DonationPipelineTab = () => {
                                                                     <p className="font-bold text-sm text-gray-800 truncate">
                                                                         {it.name}
                                                                     </p>
+                                                                    {it.isToday && (
+                                                                        <span className="text-[9px] bg-red-100 text-red-700 font-black px-1.5 py-0.5 rounded ml-2 uppercase tracking-tighter shadow-sm border border-red-200">Today</span>
+                                                                    )}
+                                                                    {it.fromCamp && (
+                                                                        <span className="text-[9px] bg-purple-100 text-purple-700 font-black px-1.5 py-0.5 rounded ml-2 uppercase tracking-tighter">Camp</span>
+                                                                    )}
+                                                                    {it.fromAppointment && (
+                                                                        <span className="text-[9px] bg-blue-100 text-blue-700 font-black px-1.5 py-0.5 rounded ml-2 uppercase tracking-tighter">Appt</span>
+                                                                    )}
                                                                 </div>
                                                                 <p className="text-xs text-gray-500 mb-2">
                                                                     Group: <span className="font-semibold text-gray-700">{it.group}</span>
+                                                                    {it.isAttended && <span className="ml-2 text-green-600 font-bold">✓ Attended</span>}
                                                                 </p>
 
                                                                 {/* Stage-specific information */}

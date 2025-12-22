@@ -53,7 +53,7 @@ const userSchema = new mongoose.Schema(
     Country: { type: String, default: "India" },
 
     // Organization fields
-    organizationType: { type: String, enum: ["HOSPITAL", "BANK", "BOTH"], default: "HOSPITAL" },
+    organizationType: { type: String, enum: ["HOSPITAL", "BANK"], default: "HOSPITAL" },
     licenseNo: { type: String },
     organizationName: { type: String },
     verificationStatus: {

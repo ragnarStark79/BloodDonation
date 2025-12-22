@@ -261,7 +261,8 @@ export const adminApi = {
 
     // Donation Management
     getDonations: async () => {
-        const res = await client.get("/api/admin/donations");
+        // Add timestamp to prevent caching
+        const res = await client.get(`/api/admin/donations?_t=${Date.now()}`);
         return res.data;
     },
 

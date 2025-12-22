@@ -100,7 +100,7 @@ requestSchema.index({ bloodGroup: 1, status: 1, urgency: 1 });
 requestSchema.index({ organizationId: 1, status: 1 });
 requestSchema.index({ "location.city": 1, status: 1 });
 // Geospatial index for nearby queries
-requestSchema.index({ location: "2dsphere" });
+
 
 // Virtual for hospital name
 requestSchema.virtual("hospitalName", {

@@ -10,134 +10,71 @@ export const DashboardProvider = ({ children }) => {
   // Get authentication state
   const { user, loading: authLoading } = useAuth();
 
+  // Add loading state for dashboard data
+  const [dataLoading, setDataLoading] = useState(true);
+
   // Ensure children is valid
   if (!children) {
     console.error("DashboardProvider: No children provided");
     return null;
   }
   // Stock: { "O+": { units: 150, reserved: 10 }, "A+": { units: 120, reserved: 5 }, ... }
-  const [stock, setStock] = useState({
-    "O+": { units: 320, reserved: 10 },
-    "O-": { units: 45, reserved: 2 },
-    "A+": { units: 280, reserved: 8 },
-    "A-": { units: 35, reserved: 1 },
-    "B+": { units: 180, reserved: 5 },
-    "B-": { units: 25, reserved: 0 },
-    "AB+": { units: 95, reserved: 3 },
-    "AB-": { units: 15, reserved: 0 },
-  });
+  // Initialize as empty - will be populated by API
+  const [stock, setStock] = useState({});
 
   // Monthly donations: array of 12 values (Jan-Dec)
+  // Initialize as zeros - will be populated by API
   const [monthlyDonations, setMonthlyDonations] = useState([
-    20, 18, 22, 25, 28, 30, 32, 35, 48, 42, 38, 45,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   ]);
 
   // Donation pipeline columns (Kanban)
+  // Initialize as empty - will be populated by API
   const [donationColumns, setDonationColumns] = useState({
     "new-donors": {
       id: "new-donors",
       title: "NEW DONORS",
       color: "from-red-50 to-red-100/50",
-      items: [
-        { id: "d-1", name: "Bella Gomez", group: "A+", date: "2024-11-28" },
-      ],
+      items: [],
     },
     screening: {
       id: "screening",
       title: "SCREENING",
       color: "from-blue-50 to-blue-100/50",
-      items: [
-        { id: "d-2", name: "Maya Patel", group: "B+", date: "2024-11-27" },
-      ],
+      items: [],
     },
     "in-progress": {
       id: "in-progress",
       title: "DONATION IN PROGRESS",
       color: "from-yellow-50 to-yellow-100/50",
-      items: [{ id: "d-3", name: "John Lee", group: "O-", date: "2024-11-30" }],
+      items: [],
     },
     completed: {
       id: "completed",
       title: "COMPLETED DONATIONS",
       color: "from-green-50 to-green-100/50",
-      items: [
-        { id: "d-4", name: "Sara Khan", group: "A+", date: "2024-10-05" },
-      ],
+      items: [],
     },
     "ready-storage": {
       id: "ready-storage",
       title: "READY FOR STORAGE",
       color: "from-slate-50 to-slate-100/50",
-      items: [
-        { id: "d-5", name: "Arun Roy", group: "AB+", date: "2024-10-01" },
-      ],
+      items: [],
     },
   });
 
-  // Users
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: "John Doe",
-      email: "john@example.com",
-      role: "Donor",
-      status: "Active",
-      avatar: "JD",
-      lastActive: "2h ago",
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      email: "jane@example.com",
-      role: "Admin",
-      status: "Active",
-      avatar: "JS",
-      lastActive: "1h ago",
-    },
-    {
-      id: 3,
-      name: "Bob Wilson",
-      email: "bob@example.com",
-      role: "Volunteer",
-      status: "Offline",
-      avatar: "BW",
-      lastActive: "1d ago",
-    },
-  ]);
+  // Users - Initialize as empty
+  const [users, setUsers] = useState([]);
 
-  // Appointments
-  const [appointments, setAppointments] = useState([
-    {
-      id: "a-1",
-      name: "Alice Brown",
-      group: "O+",
-      date: "2024-12-15",
-      time: "10:00",
-      email: "alice@example.com",
-      phone: "123-456-7890",
-      status: "Scheduled",
-      notes: "",
-    },
-  ]);
+  // Appointments - Initialize as empty
+  const [appointments, setAppointments] = useState([]);
 
-  // Requests
-  const [requests, setRequests] = useState([
-    {
-      id: "r-1",
-      hospital: "City Hospital",
-      group: "O+",
-      units: 5,
-      date: "2024-12-10",
-      urgency: "High",
-      contact: "contact@hospital.com",
-      status: "Pending",
-      notes: "",
-    },
-  ]);
+  // Requests - Initialize as empty
+  const [requests, setRequests] = useState([]);
 
   // Request pipeline columns
   const [requestColumns, setRequestColumns] = useState({
-    pending: { id: "pending", title: "Pending", items: ["r-1"] },
+    pending: { id: "pending", title: "Pending", items: [] },
     verified: { id: "verified", title: "Verified", items: [] },
     approved: { id: "approved", title: "Approved", items: [] },
     rejected: { id: "rejected", title: "Rejected", items: [] },
@@ -148,7 +85,7 @@ export const DashboardProvider = ({ children }) => {
     threshold: 20,
     autoApprove: false,
     notifications: { lowStock: true },
-    profile: { name: "Ashika", email: "admin@liforce.com" },
+    profile: { name: "Admin", email: "admin@liforce.com" },
   });
 
   // Computed: total units
@@ -159,8 +96,10 @@ export const DashboardProvider = ({ children }) => {
   const fetchDashboardData = async () => {
     try {
       // Check user role to determine which API to use
-      const userRole = user?.Role || user?.role;
-      const isAdmin = userRole === 'Admin' || userRole === 'ADMIN';
+      // Normalize role to ensure consistent check (handles 'admin', 'Admin', 'ADMIN')
+      const rawRole = user?.Role || user?.role || "";
+      const userRole = rawRole.toString().toUpperCase();
+      const isAdmin = userRole === 'ADMIN';
 
       console.log(`📊 [DashboardContext] Fetching data for role: ${userRole}`);
 
@@ -278,11 +217,16 @@ export const DashboardProvider = ({ children }) => {
         } catch (err) {
           console.error("Failed to fetch requests:", err);
         }
+
+        // Mark data as loaded
+        setDataLoading(false);
       } else {
         console.log("ℹ️ [DashboardContext] Skipping admin API calls for non-admin user");
+        setDataLoading(false);
       }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
+      setDataLoading(false);
     }
   };
 
@@ -290,8 +234,9 @@ export const DashboardProvider = ({ children }) => {
   const fetchDonations = async () => {
     try {
       // Check user role
-      const userRole = user?.Role || user?.role;
-      const isAdmin = userRole === 'Admin' || userRole === 'ADMIN';
+      const rawRole = user?.Role || user?.role || "";
+      const userRole = rawRole.toString().toUpperCase();
+      const isAdmin = userRole === 'ADMIN';
 
       if (isAdmin) {
         const data = await adminApi.getDonations();
@@ -321,6 +266,30 @@ export const DashboardProvider = ({ children }) => {
       console.log('📊 [DashboardContext] User authenticated, fetching dashboard data');
       fetchDashboardData();
       fetchDonations(); // Fetch donations from backend
+
+      // Auto-refresh every 30 seconds
+      const refreshInterval = setInterval(() => {
+        console.log('🔄 [DashboardContext] Auto-refreshing dashboard data...');
+        fetchDashboardData();
+        fetchDonations();
+      }, 30000); // 30 seconds
+
+      // Refresh when user returns to tab
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          console.log('👁️ [DashboardContext] Tab visible, refreshing data...');
+          fetchDashboardData();
+          fetchDonations();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      // Cleanup
+      return () => {
+        clearInterval(refreshInterval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        console.log('🧹 [DashboardContext] Auto-refresh cleanup complete');
+      };
     } else {
       console.log('⏭️ [DashboardContext] No authenticated user, skipping data fetch');
     }
@@ -349,6 +318,7 @@ export const DashboardProvider = ({ children }) => {
         totalUnits,
         fetchDashboardData,
         fetchDonations,
+        dataLoading, // Add loading state
       }}
     >
       {children}

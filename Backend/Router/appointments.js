@@ -50,7 +50,7 @@ router.post("/donor", donorAuth, async (req, res) => {
 
         // Verify organization exists
         const org = await User.findById(organizationId);
-        if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
+        if (!org || org.organizationType !== "BANK") {
             return res.status(404).json({ message: "Organization not found or invalid type" });
         }
 

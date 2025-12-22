@@ -78,6 +78,19 @@ export const orgApi = {
         const res = await client.post("/api/org/camps", data);
         return res.data;
     },
+    getCampParticipants: async (date) => {
+        const params = date ? { date } : {};
+        const res = await client.get("/api/org/camps/participants", { params });
+        return res.data;
+    },
+    getCampAnalytics: async (id) => {
+        const res = await client.get(`/api/org/camps/${id}/analytics`);
+        return res.data;
+    },
+    exportCampReport: async (id) => {
+        const res = await client.get(`/api/org/camps/${id}/export`, { responseType: 'blob' });
+        return res.data;
+    },
 
     // Appointments
     getAppointments: async () => {

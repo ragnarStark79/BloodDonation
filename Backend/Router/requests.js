@@ -414,7 +414,7 @@ router.get("/org/:id/matches", orgAuth, async (req, res) => {
 
         // Find compatible blood banks with stock
         const bloodBankUsers = await User.find({
-            organizationType: { $in: ["BANK", "BOTH"] },
+            organizationType: "BANK",
             _id: { $ne: request.organizationId } // Exclude requesting organization
         })
             .select("organizationName location city state phone email")
@@ -606,7 +606,7 @@ router.get("/org/incoming", orgAuth, async (req, res) => {
 
         // Get organization with location
         const org = await User.findById(req.user.userId);
-        if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
+        if (!org || org.organizationType !== "BANK") {
             return res.status(403).json({ message: "Only blood banks can access this" });
         }
 
@@ -723,7 +723,7 @@ router.post("/org/:id/reserve", orgAuth, async (req, res) => {
 
         // Get organization
         const org = await User.findById(req.user.userId);
-        if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
+        if (!org || org.organizationType !== "BANK") {
             return res.status(403).json({ message: "Only blood banks can reserve units" });
         }
 
@@ -807,7 +807,7 @@ router.post("/org/:id/issue", orgAuth, async (req, res) => {
 
         // Get organization
         const org = await User.findById(req.user.userId);
-        if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
+        if (!org || org.organizationType !== "BANK") {
             return res.status(403).json({ message: "Only blood banks can issue units" });
         }
 
@@ -871,7 +871,7 @@ router.delete("/org/:id/reserve", orgAuth, async (req, res) => {
 
         // Get organization
         const org = await User.findById(req.user.userId);
-        if (!org || !["BANK", "BOTH"].includes(org.organizationType)) {
+        if (!org || org.organizationType !== "BANK") {
             return res.status(403).json({ message: "Only blood banks can release reservations" });
         }
 

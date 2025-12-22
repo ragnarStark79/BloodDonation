@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import orgApi from '../../api/orgApi';
 import { useAuth } from '../../context/AuthContext';
-import { Package, AlertTriangle, Calendar, FileText, Inbox, TrendingUp, Clock } from 'lucide-react';
+import { Package, AlertTriangle, Calendar, FileText, Inbox, TrendingUp, Clock, RefreshCw } from 'lucide-react';
 import { getOrgPermissions, getOrgTypeLabel, getOrgTypeBadgeColor } from './orgUtils';
-import DonationStatsCards from './DonationStatsCards';
+
 import DonationTrendsChart from './DonationTrendsChart';
 import BloodGroupChart from './BloodGroupChart';
+import OrganizationMapWidget from './OrganizationMapWidget';
+import { toast } from 'sonner';
 
 const StatCard = ({ icon: Icon, label, value, color = "red", onClick }) => {
     const colorStyles = {
@@ -128,6 +130,7 @@ const OrgOverview = () => {
         const interval = setInterval(() => {
             fetchDashboard();
             fetchDonationStats();
+            fetchChartData(); // Also refresh charts
         }, 30000); // 30 seconds
 
         // Refresh when user returns to tab
@@ -135,6 +138,7 @@ const OrgOverview = () => {
             if (!document.hidden) {
                 fetchDashboard();
                 fetchDonationStats();
+                fetchChartData(); // Also refresh charts
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -172,14 +176,22 @@ const OrgOverview = () => {
     const fetchChartData = async () => {
         try {
             setChartsLoading(true);
+            console.log('🔄 Fetching chart data...');
+
             const [trends, distribution] = await Promise.all([
                 orgApi.getMonthlyDonationTrends(),
                 orgApi.getBloodGroupDistribution()
             ]);
+
+            console.log('📊 Chart data received:');
+            console.log('  - Monthly trends:', trends);
+            console.log('  - Blood distribution:', distribution);
+
             setMonthlyTrends(trends);
             setBloodDistribution(distribution);
         } catch (err) {
-            console.error('Failed to fetch chart data:', err);
+            console.error('❌ Failed to fetch chart data:', err);
+            console.error('  Error details:', err.response?.data || err.message);
         } finally {
             setChartsLoading(false);
         }
@@ -227,12 +239,23 @@ const OrgOverview = () => {
                                 <span>Manage Blood Supply & Distribution</span>
                             </p>
                         </div>
-                        <div className="hidden md:block">
-                            <div className={`px-6 py-3 rounded-xl text-sm font-semibold shadow-lg backdrop-blur-sm border border-white/20 ${orgType === 'BOTH'
-                                ? 'bg-white/95 text-purple-700'
-                                : orgType === 'BANK'
-                                    ? 'bg-white/95 text-red-700'
-                                    : 'bg-white/95 text-blue-700'
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => {
+                                    fetchDashboard();
+                                    fetchDonationStats();
+                                    fetchChartData();
+                                    toast.success('Dashboard refreshed');
+                                }}
+                                className="px-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 text-white rounded-lg hover:bg-white/30 transition font-medium flex items-center gap-2"
+                                title="Refresh all data"
+                            >
+                                <RefreshCw size={18} />
+                                <span className="hidden md:inline">Refresh</span>
+                            </button>
+                            <div className={`px-6 py-3 rounded-xl text-sm font-semibold shadow-lg backdrop-blur-sm border border-white/20 ${orgType === 'BANK'
+                                ? 'bg-white/95 text-red-700'
+                                : 'bg-white/95 text-blue-700'
                                 }`}>
                                 {getOrgTypeLabel(orgType)}
                             </div>
@@ -352,10 +375,7 @@ const OrgOverview = () => {
                 </div>
             )}
 
-            {/* Donation Stats Cards - for Blood Banks */}
-            {permissions.canManageInventory && (
-                <DonationStatsCards stats={donationStats} loading={statsLoading} />
-            )}
+
 
             {/* Three-column layout for requests, appointments, and inventory */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -492,6 +512,13 @@ const OrgOverview = () => {
                     </div>
                 )}
             </div>
+
+            {/* Network Map (Blood Banks only) */}
+            {orgType === 'BANK' && (
+                <div className="mt-6">
+                    <OrganizationMapWidget />
+                </div>
+            )}
         </div>
     );
 };

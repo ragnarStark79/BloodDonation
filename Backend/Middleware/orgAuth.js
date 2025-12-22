@@ -34,7 +34,7 @@ export const orgAuth = (req, res, next) => {
 
 /**
  * Middleware to restrict access based on organization type
- * @param {Array<string>} allowedTypes - Array of allowed organization types (e.g., ['HOSPITAL', 'BOTH'])
+ * @param {Array<string>} allowedTypes - Array of allowed organization types (e.g., ['HOSPITAL', 'BANK'])
  */
 export const requireOrgType = (allowedTypes) => {
     return (req, res, next) => {
@@ -63,14 +63,14 @@ export const requireOrgType = (allowedTypes) => {
 /**
  * Helper to check if org can manage inventory (Blood Banks only)
  */
-export const canManageInventory = requireOrgType([ORG_TYPES.BLOOD_BANK, ORG_TYPES.BOTH]);
+export const canManageInventory = requireOrgType([ORG_TYPES.BLOOD_BANK]);
 
 /**
  * Helper to check if org can create blood requests (Hospitals only)
  */
-export const canCreateRequests = requireOrgType([ORG_TYPES.HOSPITAL, ORG_TYPES.BOTH]);
+export const canCreateRequests = requireOrgType([ORG_TYPES.HOSPITAL]);
 
 /**
  * Helper to check if org can view incoming requests (Blood Banks only)
  */
-export const canViewIncoming = requireOrgType([ORG_TYPES.BLOOD_BANK, ORG_TYPES.BOTH]);
+export const canViewIncoming = requireOrgType([ORG_TYPES.BLOOD_BANK]);

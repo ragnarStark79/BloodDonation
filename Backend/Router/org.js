@@ -47,7 +47,7 @@ router.get("/dashboard", auth([ROLES.ORGANIZATION]), async (req, res) => {
     response.stats.upcomingAppts = upcomingAppts;
 
     // Inventory stats (for blood banks only)
-    if (orgType === ORG_TYPES.BLOOD_BANK || orgType === ORG_TYPES.BOTH) {
+    if (orgType === ORG_TYPES.BLOOD_BANK) {
       const [availableUnits, expiringSoon] = await Promise.all([
         BloodUnit.countDocuments({ organizationId: orgId, status: "AVAILABLE" }),
         BloodUnit.countDocuments({
@@ -83,7 +83,7 @@ router.get("/dashboard", auth([ROLES.ORGANIZATION]), async (req, res) => {
     }
 
     // My Requests (for hospitals)
-    if (orgType === ORG_TYPES.HOSPITAL || orgType === ORG_TYPES.BOTH) {
+    if (orgType === ORG_TYPES.HOSPITAL) {
       const myRequests = await Request.find({
         createdBy: orgId,
         status: { $in: [REQUEST_STATUS.OPEN, REQUEST_STATUS.ASSIGNED] }
@@ -96,7 +96,7 @@ router.get("/dashboard", auth([ROLES.ORGANIZATION]), async (req, res) => {
     }
 
     // Incoming Requests (for blood banks)
-    if (orgType === ORG_TYPES.BLOOD_BANK || orgType === ORG_TYPES.BOTH) {
+    if (orgType === ORG_TYPES.BLOOD_BANK) {
       // Get blood groups available in inventory
       const availableGroups = await BloodUnit.distinct("bloodGroup", {
         organizationId: orgId,
@@ -152,11 +152,15 @@ router.get("/donation-stats", auth([ROLES.ORGANIZATION]), async (req, res) => {
     const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+    // IMPORTANT: In aggregation, we MUST cast orgId to ObjectId
+    const orgObjectId = new mongoose.Types.ObjectId(orgId);
+
     // Count by stage
     const byStage = await Donation.aggregate([
-      { $match: { organizationId: orgId } },
+      { $match: { organizationId: orgObjectId } },
       { $group: { _id: "$stage", count: { $sum: 1 } } }
     ]);
+    console.log('📊 Donation stats by stage:', byStage);
 
     // Convert to object
     const stageStats = {
@@ -209,10 +213,9 @@ router.get("/donation-stats", auth([ROLES.ORGANIZATION]), async (req, res) => {
       updatedAt: { $gte: todayStart }
     });
 
-    // Failed tests count
     const failedTests = completedDonations.filter(d => d.labTests?.allTestsPassed === false).length;
 
-    res.json({
+    const response = {
       totalInPipeline,
       byStage: stageStats,
       today,
@@ -221,7 +224,9 @@ router.get("/donation-stats", auth([ROLES.ORGANIZATION]), async (req, res) => {
       successRate,
       completedToday,
       failedTests
-    });
+    };
+    console.log('✅ Sending donation pipeline stats:', response);
+    res.json(response);
   } catch (error) {
     console.error("Donation stats error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -237,23 +242,46 @@ router.get("/monthly-donation-trends", auth([ROLES.ORGANIZATION]), async (req, r
     // Get last 12 months of data
     const monthsData = [];
     const now = new Date();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Import Request model dynamically to ensure it's available
+    const Request = mongoose.model('Request');
 
     for (let i = 11; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
 
-      const count = await Donation.countDocuments({
-        organizationId: orgId,
-        createdAt: { $gte: monthStart, $lte: monthEnd }
-      });
+      const [donationCount, requestCount] = await Promise.all([
+        Donation.countDocuments({
+          organizationId: orgId,
+          createdAt: { $gte: monthStart, $lte: monthEnd }
+        }),
+        Request.countDocuments({
+          'assignedTo.organizationId': orgId,  // Blood bank who fulfilled it
+          status: "FULFILLED",
+          updatedAt: { $gte: monthStart, $lte: monthEnd }
+        })
+      ]);
 
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      // Debug logging for December and November
+      if (i === 0 || i === 1) {
+        console.log(`Month ${monthNames[monthStart.getMonth()]}:`, {
+          orgId,
+          monthStart: monthStart.toISOString(),
+          monthEnd: monthEnd.toISOString(),
+          donationCount,
+          requestCount
+        });
+      }
+
       monthsData.push({
         month: monthNames[monthStart.getMonth()],
-        donations: count
+        donations: donationCount,
+        requests: requestCount
       });
     }
 
+    console.log('📈 Monthly Trends Data:', monthsData);
     res.json(monthsData);
   } catch (error) {
     console.error("Monthly trends error:", error);
@@ -265,13 +293,16 @@ router.get("/monthly-donation-trends", auth([ROLES.ORGANIZATION]), async (req, r
 router.get("/blood-group-distribution", auth([ROLES.ORGANIZATION]), async (req, res) => {
   try {
     const orgId = req.user.userId;
+    console.log('🩸 Blood distribution API called for org:', orgId);
 
     // Get inventory counts by blood group
     const distribution = await BloodUnit.aggregate([
-      { $match: { organizationId: orgId, status: "AVAILABLE" } },
+      { $match: { organizationId: new mongoose.Types.ObjectId(orgId), status: "AVAILABLE" } },
       { $group: { _id: "$bloodGroup", count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
     ]);
+
+    console.log('📊 Blood distribution raw data:', distribution);
 
     // Define color palette matching chart design
     const colorMap = {
@@ -292,9 +323,10 @@ router.get("/blood-group-distribution", auth([ROLES.ORGANIZATION]), async (req, 
       color: colorMap[item._id] || '#ef4444'
     }));
 
+    console.log('✅ Sending chart data:', chartData);
     res.json(chartData);
   } catch (error) {
-    console.error("Blood distribution error:", error);
+    console.error("❌ Blood distribution error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
@@ -368,6 +400,9 @@ router.post("/inventory", auth([ROLES.ORGANIZATION]), canManageInventory, async 
     if (!group || !collectionDate || !expiryDate) {
       return res.status(400).json({ message: "group, collectionDate, expiryDate are required" });
     }
+
+    console.log('💉 Adding blood unit for org:', req.user.userId);
+
     const unit = await BloodUnit.create({
       organizationId: req.user.userId,
       bloodGroup: group,
@@ -376,6 +411,9 @@ router.post("/inventory", auth([ROLES.ORGANIZATION]), canManageInventory, async 
       expiryDate,
       barcode,
     });
+
+    console.log('✅ Blood unit created:', { id: unit._id, bloodGroup: unit.bloodGroup, status: unit.status, orgId: unit.organizationId });
+
     res.status(201).json(unit);
   } catch (err) {
     console.error(err);
@@ -759,23 +797,55 @@ router.post("/requests/:id/assign-donor", auth([ROLES.ORGANIZATION]), async (req
   }
 });
 
-// Camps
+// Camps - Create (Blood Banks only)
 router.post("/camps", auth([ROLES.ORGANIZATION]), async (req, res) => {
   try {
-    const { title, date, lat, lng, address, capacity } = req.body;
+    // Check if organization is a blood bank
+    const org = await User.findById(req.user.userId).select("organizationType").lean();
+    if (!org || org.organizationType !== "BANK") {
+      return res.status(403).json({
+        message: "Only blood banks can organize donation camps. Hospitals don't have inventory management."
+      });
+    }
+
+    const {
+      title,
+      date,
+      startTime,
+      endTime,
+      description,
+      lat,
+      lng,
+      address,
+      capacity,
+      contactPerson,
+      contactPhone,
+      requirements,
+      bloodGroupsNeeded
+    } = req.body;
+
     if (!title || !date || lat === undefined || lng === undefined) {
       return res.status(400).json({ message: "title, date, lat, lng are required" });
     }
+
     const camp = await Camp.create({
       organizationId: req.user.userId,
       title,
       date,
+      startTime,
+      endTime,
+      description,
       location: {
         coordinates: { type: "Point", coordinates: [Number(lng), Number(lat)] },
         address,
       },
       capacity,
+      contactPerson,
+      contactPhone,
+      requirements: requirements || [],
+      bloodGroupsNeeded: bloodGroupsNeeded || [],
     });
+
     res.status(201).json(camp);
   } catch (err) {
     console.error(err);
@@ -814,11 +884,291 @@ router.get("/camps", auth([ROLES.ORGANIZATION]), async (req, res) => {
   }
 });
 
+// Get Camp Participants for Pipeline
+router.get("/camps/participants", auth([ROLES.ORGANIZATION]), async (req, res) => {
+  try {
+    const { date } = req.query; // Optional filter by date
+
+    let query = { organizationId: req.user.userId };
+    if (date) {
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+      query.date = { $gte: dayStart, $lte: dayEnd };
+    } else {
+      // Default to showing participants from ONGOING camps
+      query.status = "ONGOING";
+    }
+
+    const camps = await Camp.find(query)
+      .populate("registeredDonors", "Name Email PhoneNumber bloodGroup Gender DateOfBirth")
+      .lean();
+
+    // Flatten participants for pipeline view
+    const participants = camps.flatMap(camp =>
+      (camp.registeredDonors || [])
+        .filter(donor => donor && donor._id) // Filter out null or broken references
+        .map(donor => ({
+          ...donor,
+          _id: donor._id.toString(), // Ensure ID is string for frontend
+          campId: camp._id.toString(),
+          campTitle: camp.title,
+          isAttended: (camp.attendedDonors || []).some(id => id && id.toString() === donor._id.toString())
+        }))
+    );
+
+    res.json(participants);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get Single Camp
+router.get("/camps/:id", auth([ROLES.ORGANIZATION]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const camp = await Camp.findOne({
+      _id: id,
+      organizationId: req.user.userId
+    })
+      .populate("registeredDonors", "Name Email PhoneNumber bloodGroup")
+      .populate("attendedDonors", "Name Email PhoneNumber bloodGroup")
+      .lean();
+
+    if (!camp) {
+      return res.status(404).json({ message: "Camp not found" });
+    }
+
+    res.json(camp);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Update Camp
+router.put("/camps/:id", auth([ROLES.ORGANIZATION]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      date,
+      startTime,
+      endTime,
+      description,
+      lat,
+      lng,
+      address,
+      capacity,
+      contactPerson,
+      contactPhone,
+      requirements,
+      bloodGroupsNeeded,
+      status
+    } = req.body;
+
+    const updateData = {};
+    if (title) updateData.title = title;
+    if (date) updateData.date = date;
+    if (startTime !== undefined) updateData.startTime = startTime;
+    if (endTime !== undefined) updateData.endTime = endTime;
+    if (description !== undefined) updateData.description = description;
+    if (capacity !== undefined) updateData.capacity = capacity;
+    if (contactPerson !== undefined) updateData.contactPerson = contactPerson;
+    if (contactPhone !== undefined) updateData.contactPhone = contactPhone;
+    if (requirements) updateData.requirements = requirements;
+    if (bloodGroupsNeeded) updateData.bloodGroupsNeeded = bloodGroupsNeeded;
+    if (status) updateData.status = status;
+
+    if (lat !== undefined && lng !== undefined) {
+      updateData.location = {
+        coordinates: { type: "Point", coordinates: [Number(lng), Number(lat)] },
+        address: address || ""
+      };
+    } else if (address !== undefined) {
+      updateData["location.address"] = address;
+    }
+
+    const camp = await Camp.findOneAndUpdate(
+      { _id: id, organizationId: req.user.userId },
+      updateData,
+      { new: true }
+    ).lean();
+
+    if (!camp) {
+      return res.status(404).json({ message: "Camp not found" });
+    }
+
+    res.json(camp);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Delete Camp
+router.delete("/camps/:id", auth([ROLES.ORGANIZATION]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const camp = await Camp.findOneAndDelete({
+      _id: id,
+      organizationId: req.user.userId
+    });
+
+    if (!camp) {
+      return res.status(404).json({ message: "Camp not found" });
+    }
+
+    res.json({ message: "Camp deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get Camp Statistics
+router.get("/camps/stats/overview", auth([ROLES.ORGANIZATION]), async (req, res) => {
+  try {
+    const orgId = req.user.userId;
+    const now = new Date();
+
+    const [totalCamps, upcomingCamps, completedCamps, totalRegistrations] = await Promise.all([
+      Camp.countDocuments({ organizationId: orgId }),
+      Camp.countDocuments({
+        organizationId: orgId,
+        status: "PLANNED",
+        date: { $gte: now }
+      }),
+      Camp.countDocuments({
+        organizationId: orgId,
+        status: "COMPLETED"
+      }),
+      Camp.aggregate([
+        { $match: { organizationId: new mongoose.Types.ObjectId(orgId) } },
+        { $project: { count: { $size: "$registeredDonors" } } },
+        { $group: { _id: null, total: { $sum: "$count" } } }
+      ])
+    ]);
+
+    res.json({
+      totalCamps,
+      upcomingCamps,
+      completedCamps,
+      totalRegistrations: totalRegistrations[0]?.total || 0
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Mark/Toggle Attendance
+router.put("/camps/:id/attendance/:donorId", auth([ROLES.ORGANIZATION]), async (req, res) => {
+  try {
+    const { id, donorId } = req.params;
+    const { attended } = req.body;
+
+    const camp = await Camp.findOne({
+      _id: id,
+      organizationId: req.user.userId
+    });
+
+    if (!camp) {
+      return res.status(404).json({ message: "Camp not found" });
+    }
+
+    const donorIndex = camp.attendedDonors.indexOf(donorId);
+
+    if (attended && donorIndex === -1) {
+      camp.attendedDonors.push(donorId);
+    } else if (!attended && donorIndex !== -1) {
+      camp.attendedDonors.splice(donorIndex, 1);
+    }
+
+    await camp.save();
+    res.json({ message: "Attendance updated", attendedDonors: camp.attendedDonors });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get Detailed Camp Stats
+router.get("/camps/:id/analytics", auth([ROLES.ORGANIZATION]), async (req, res) => {
+  try {
+    const camp = await Camp.findOne({
+      _id: req.params.id,
+      organizationId: req.user.userId
+    }).populate("registeredDonors", "Name Email bloodGroup");
+
+    if (!camp) return res.status(404).json({ message: "Camp not found" });
+
+    // Fetch all donations linked to this camp
+    const donations = await Donation.find({ campId: camp._id, status: { $in: ["active", "completed"] } });
+
+    const bloodGroupStats = donations.reduce((acc, donation) => {
+      acc[donation.bloodGroup] = (acc[donation.bloodGroup] || 0) + (donation.unitsCollected || 1);
+      return acc;
+    }, {});
+
+    const stats = {
+      title: camp.title,
+      date: camp.date,
+      totalRegistered: camp.registeredDonors.length,
+      totalAttended: camp.attendedDonors.length,
+      totalUnitsCollected: donations.reduce((sum, d) => sum + (d.unitsCollected || 1), 0),
+      bloodGroupStats,
+      attendanceRate: camp.registeredDonors.length > 0
+        ? ((camp.attendedDonors.length / camp.registeredDonors.length) * 100).toFixed(1)
+        : 0
+    };
+
+    res.json(stats);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Export Camp Report (CSV)
+router.get("/camps/:id/export", auth([ROLES.ORGANIZATION]), async (req, res) => {
+  try {
+    const camp = await Camp.findOne({
+      _id: req.params.id,
+      organizationId: req.user.userId
+    }).populate("registeredDonors", "Name Email PhoneNumber bloodGroup Gender DateOfBirth");
+
+    if (!camp) return res.status(404).json({ message: "Camp not found" });
+
+    // Get donations for this camp to show collection results
+    const donations = await Donation.find({ campId: camp._id });
+
+    let csv = "Donor Name,Email,Phone,Blood Group,Gender,Status,Units Collected,Notes\n";
+
+    camp.registeredDonors.forEach(donor => {
+      const isAttended = camp.attendedDonors.includes(donor._id.toString());
+      const donation = donations.find(d => d.donorId?.toString() === donor._id.toString());
+
+      csv += `"${donor.Name}","${donor.Email}","${donor.PhoneNumber || ''}","${donor.bloodGroup}","${donor.Gender || ''}","${isAttended ? 'Attended' : 'Registered'}","${donation?.unitsCollected || 0}","${donation?.notes || ''}"\n`;
+    });
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename=camp_report_${req.params.id}.csv`);
+    res.status(200).send(csv);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 // Get Appointments
 router.get("/appointments", auth([ROLES.ORGANIZATION]), async (req, res) => {
   try {
     const list = await Appointment.find({ organizationId: req.user.userId })
-      .populate("donorId", "Name Email bloodGroup")
+      .populate("donorId", "Name Email bloodGroup PhoneNumber Phone location")
       .sort({ dateTime: 1 })
       .lean();
     res.json(list);
@@ -961,7 +1311,7 @@ router.get("/analytics", auth([ROLES.ORGANIZATION]), async (req, res) => {
     };
 
     // Request statistics (for hospitals)
-    if (orgType === ORG_TYPES.HOSPITAL || orgType === ORG_TYPES.BOTH) {
+    if (orgType === ORG_TYPES.HOSPITAL) {
       const [totalRequests, fulfilledRequests, cancelledRequests] = await Promise.all([
         Request.countDocuments({ createdBy: orgId }),
         Request.countDocuments({ createdBy: orgId, status: REQUEST_STATUS.FULFILLED }),
@@ -987,7 +1337,7 @@ router.get("/analytics", auth([ROLES.ORGANIZATION]), async (req, res) => {
     }
 
     // Inventory statistics (for blood banks)
-    if (orgType === ORG_TYPES.BLOOD_BANK || orgType === ORG_TYPES.BOTH) {
+    if (orgType === ORG_TYPES.BLOOD_BANK) {
       const inventoryByStatus = await BloodUnit.aggregate([
         { $match: { organizationId: orgId } },
         { $group: { _id: "$status", count: { $sum: 1 } } }

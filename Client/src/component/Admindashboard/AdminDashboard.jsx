@@ -124,7 +124,18 @@ const AdminDashboard = () => {
     totalUnits,
     fetchDashboardData,
     fetchDonations,
+    dataLoading,
   } = dashboardContext;
+
+  // Add fallback fetch on mount to ensure data loads
+  useEffect(() => {
+    if (!dataLoading && Object.keys(stock || {}).length === 0) {
+      console.log("AdminDashboard: Initial data check - fetching...");
+      fetchDashboardData();
+    }
+  }, []);
+
+
 
   // Map URL path to page name
   const getPageFromPath = (path) => {
@@ -639,6 +650,19 @@ const AdminDashboard = () => {
   const safeUsers = users || [];
   const safeAppointments = appointments || [];
   const safeRequests = requests || [];
+
+  // Show loading state (moved to bottom to strictly follow Rules of Hooks)
+  if (dataLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-700">Loading Dashboard...</h2>
+          <p className="text-gray-500 text-sm mt-2">Fetching latest data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-800 font-sans">

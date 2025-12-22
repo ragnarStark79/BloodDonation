@@ -217,10 +217,13 @@ const InventoryView = () => {
                             <span className="text-2xl">×</span>
                         </button>
                     </div>
-                    <AddInventory onAdded={(item) => {
-                        setInventory([...inventory, item]);
-                        toast.success("Unit added to inventory");
-                        setShowForm(false);
+                    <AddInventory onAdded={(itemOrItems) => {
+                        // Handle both single item and array of items
+                        const newItems = Array.isArray(itemOrItems) ? itemOrItems : [itemOrItems];
+                        setInventory([...inventory, ...newItems]);
+                        const count = newItems.length;
+                        toast.success(`${count} unit${count > 1 ? 's' : ''} added to inventory`);
+                        fetchInventory(); // Refresh to ensure sync
                     }} />
                 </div>
             )}

@@ -83,7 +83,7 @@ const donationSchema = new mongoose.Schema(
         // Overall status
         status: {
             type: String,
-            enum: ["active", "rejected", "aborted", "completed"],
+            enum: ["active", "rejected", "aborted", "completed", "used", "stored"],
             default: "active",
         },
         // Admin tracking
@@ -102,6 +102,16 @@ const donationSchema = new mongoose.Schema(
         appointmentId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Appointment",
+            required: false,
+        },
+        // Camp links
+        campId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Camp",
+            required: false,
+        },
+        campParticipantId: {
+            type: String, // format: "donorId_campId"
             required: false,
         },
         // Detailed screening data
@@ -275,6 +285,20 @@ donationSchema.methods.moveToStage = async function (newStage, performedBy, note
 
         // Auto-fulfill appointment and request
         await this.autoFulfillRequest();
+
+        // ✨ AUTO-HIDE FROM PIPELINE ✨
+        const User = (await import("./User.js")).default;
+        const org = await User.findById(this.organizationId).select("organizationType").lean();
+
+        if (org && org.organizationType === "BANK") {
+            // BLOOD BANK: Mark as stored (will be added to inventory manually)
+            this.status = "stored";
+            console.log(`✅ [BLOOD BANK] Donation ${this._id} marked as 'stored' - hidden from pipeline`);
+        } else {
+            // HOSPITAL: Mark as used (blood used on patient)
+            this.status = "used";
+            console.log(`✅ [HOSPITAL] Donation ${this._id} marked as 'used' - hidden from pipeline`);
+        }
     } else if (newStage === "rejected") {
         // Mark donation as rejected (failed lab tests)
         this.status = "rejected";

@@ -13,8 +13,16 @@ const adminOrOrg = auth([ROLES.ADMIN, ROLES.ORGANIZATION]);
 // @access  Admin
 router.get("/", adminOrOrg, async (req, res) => {
     try {
+        // Set no-cache headers to prevent stale data in browser
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+
         // Filter by organization for non-admin users
-        const query = { status: { $in: ["active", "completed"] } }; // Include both active and completed (ready-storage) donations
+        // Exclude 'stored' (blood bank inventory) and 'used' (hospital patient use)
+        const query = { status: { $in: ["active", "completed"] } };
         if (req.user.role !== ROLES.ADMIN) {
             query.organizationId = req.user.userId;
         }
@@ -70,7 +78,9 @@ router.get("/", adminOrOrg, async (req, res) => {
                 screeningNotes: donation.screeningNotes,
                 bloodBagId: donation.bloodBagId,
                 unitsCollected: donation.unitsCollected,
-                appointmentId: donation.appointmentId, // Add appointmentId for deduplication
+                appointmentId: donation.appointmentId,
+                campId: donation.campId,
+                campParticipantId: donation.campParticipantId,
                 screening: donation.screening,
                 screeningStatus: donation.screeningStatus,
                 collection: donation.collection,
@@ -94,7 +104,7 @@ router.get("/", adminOrOrg, async (req, res) => {
 // @access  Admin
 router.post("/", adminOrOrg, async (req, res) => {
     try {
-        const { donorName, bloodGroup, phone, email, notes, donorId, appointmentId } = req.body;
+        const { donorName, bloodGroup, phone, email, notes, donorId, appointmentId, campId, campParticipantId } = req.body;
 
         if (!donorName || !bloodGroup) {
             return res
@@ -102,12 +112,16 @@ router.post("/", adminOrOrg, async (req, res) => {
                 .json({ message: "Donor name and blood group are required" });
         }
 
-        // Check for duplicate donation if appointmentId is provided
-        if (appointmentId) {
-            const existingDonation = await Donation.findOne({ appointmentId });
+        // Check for duplicate donation if appointmentId or campParticipantId is provided
+        if (appointmentId || campParticipantId) {
+            const query = [];
+            if (appointmentId) query.push({ appointmentId });
+            if (campParticipantId) query.push({ campParticipantId });
+
+            const existingDonation = await Donation.findOne({ $or: query });
             if (existingDonation) {
                 return res.status(400).json({
-                    message: "Donation already exists for this appointment",
+                    message: `Donation already exists for this ${appointmentId ? 'appointment' : 'camp participant'}`,
                     donationId: existingDonation._id,
                     donation: {
                         _id: existingDonation._id.toString(),
@@ -118,6 +132,8 @@ router.post("/", adminOrOrg, async (req, res) => {
                         phone: existingDonation.phone,
                         email: existingDonation.email,
                         stage: existingDonation.stage,
+                        campId: existingDonation.campId,
+                        campParticipantId: existingDonation.campParticipantId
                     }
                 });
             }
@@ -131,6 +147,8 @@ router.post("/", adminOrOrg, async (req, res) => {
             notes,
             donorId: donorId || null,
             appointmentId: appointmentId || null,
+            campId: campId || null,
+            campParticipantId: campParticipantId || null,
             stage: "new-donors",
             createdBy: req.user.userId,
             organizationId: req.user.role === ROLES.ADMIN ? req.body.organizationId || req.user.userId : req.user.userId,

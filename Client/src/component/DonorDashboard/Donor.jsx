@@ -12,6 +12,7 @@ import NearbyRequests from './NearbyRequests';
 import NearbyRequestsPage from './NearbyRequestsPage';
 import Appointments from './Appointments';
 import HistoryList from './HistoryList';
+import CampsPage from './CampsPage';
 
 const Donor = () => {
     const [user, setUser] = useState(null);
@@ -67,6 +68,7 @@ const Donor = () => {
                             <Route index element={<Navigate to="dashboard" replace />} />
                             <Route path="dashboard" element={<DonorDashboardHome user={user} fetchProfile={fetchProfile} />} />
                             <Route path="nearby-requests" element={<NearbyRequests />} />
+                            <Route path="camps" element={<CampsPage />} />
                             <Route path="appointments" element={<Appointments />} />
                             <Route path="history" element={<HistoryList />} />
                             <Route path="profile" element={<ProfilePage />} />

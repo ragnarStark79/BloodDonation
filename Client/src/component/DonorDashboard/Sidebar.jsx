@@ -13,6 +13,7 @@ const Sidebar = () => {
     const links = [
         { name: 'Dashboard', icon: Home, path: '/donor/dashboard' },
         { name: 'Nearby Requests', icon: MapPin, path: '/donor/nearby-requests' },
+        { name: 'Donation Camps', icon: Droplet, path: '/donor/camps' },
         { name: 'My Appointments', icon: CalendarCheck, path: '/donor/appointments' },
         { name: 'Donation History', icon: BarChart2, path: '/donor/history' },
         { name: 'My Profile', icon: User, path: '/donor/profile' },

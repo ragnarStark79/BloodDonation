@@ -6,7 +6,11 @@ const appointmentSchema = new mongoose.Schema(
     organizationId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     requestId: { type: mongoose.Schema.Types.ObjectId, ref: "Request" },
     dateTime: { type: Date, required: true },
-    status: { type: String, enum: ["UPCOMING", "COMPLETED", "CANCELLED"], default: "UPCOMING" },
+    status: {
+      type: String,
+      enum: ["UPCOMING", "COMPLETED", "CANCELLED", "COLLECTED", "IN_PROGRESS", "REJECTED"],
+      default: "UPCOMING"
+    },
     notes: { type: String },
     unitsCollected: { type: Number },
     donationSuccessful: { type: Boolean },

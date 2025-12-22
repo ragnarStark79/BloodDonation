@@ -285,7 +285,6 @@ const Signup = () => {
                       <option value="">Select Organization Type</option>
                       <option value="HOSPITAL">Hospital</option>
                       <option value="BANK">Blood Bank</option>
-                      <option value="BOTH">Both (Hospital & Blood Bank)</option>
                     </select>
                     {errors.organizationType && <p className="text-red-500 text-xs mt-1 ml-1">{errors.organizationType}</p>}
                   </div>
