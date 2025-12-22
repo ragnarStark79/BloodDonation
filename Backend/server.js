@@ -21,6 +21,18 @@ import appointmentRoutes from "./Router/appointments.js";
 
 const app = express();
 
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://blood-donation-kplu.vercel.app",
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(helmet());
 app.use(compression());
 app.use(express.json());
@@ -44,7 +56,7 @@ connectdb();
 
 // api health
 app.get("/api/health", (req, res) => {
-    res.status(200).json({ status: "OK" });
+  res.status(200).json({ status: "OK" });
 })
 
 // Routes
