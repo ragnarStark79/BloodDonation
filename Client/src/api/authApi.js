@@ -2,7 +2,7 @@ import client from "./client";
 
 export const authApi = {
     login: async (email, password, role) => {
-        const res = await client.post("/api/login", { Email: email, Password: password, Role: role });
+        const res = await client.post("https://blood-donation-lac.vercel.app/api/login", { Email: email, Password: password, Role: role });
         return res.data;
     },
     signup: async (data) => {
