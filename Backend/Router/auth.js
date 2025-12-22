@@ -66,7 +66,7 @@ router.post("/signup", async (req, res) => {
     // Check if user already exists
     let user = await User.findOne({ Email });
     if (user) {
-      console.log("Signup Debug: User already exists", Email);
+
       return res.status(400).json({ msg: "User already exists" });
     }
 
@@ -167,8 +167,7 @@ router.post("/signup", async (req, res) => {
       verificationStatus: user.verificationStatus,
     });
   } catch (err) {
-    console.error("Signup error details:", JSON.stringify(err, null, 2));
-    console.error("Signup error stack:", err.stack);
+
     res.status(500).json({ message: "Server error during signup", error: err.message });
   }
 });
@@ -188,7 +187,7 @@ router.post("/login", async (req, res) => {
     const userRole = (user.Role || "").toLowerCase();
     const isValidDonor = canonical === ROLES.DONOR && (userRole === "donar" || userRole === "donor");
 
-    console.log(`Login Debug: Email=${Email}, Role=${Role}, UserRole=${user.Role}, Canonical=${canonical}, Legacy=${legacy}, IsValidDonor=${isValidDonor}`);
+
 
     if (!isValidDonor && userRole !== legacy) {
       return res.status(403).json({ msg: "Role does not match! Please select correct role." });
@@ -225,7 +224,7 @@ router.post("/login", async (req, res) => {
       accountStatus: user.accountStatus,
     });
   } catch (err) {
-    console.error("Login error:", err);
+
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -272,7 +271,7 @@ router.get("/auth/me", auth(), async (req, res) => {
 
     res.json(response);
   } catch (err) {
-    console.error(err);
+
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -415,7 +414,7 @@ router.post("/forgot-password", async (req, res) => {
       userRole: user.Role,
     });
   } catch (err) {
-    console.error("Forgot password error:", err.message);
+
 
     if (err.code === "EAUTH") {
       return res.json({
@@ -461,7 +460,7 @@ router.post("/change-password", auth(), async (req, res) => {
 
     res.json({ message: "Password changed successfully" });
   } catch (err) {
-    console.error(err);
+
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -505,7 +504,7 @@ router.put("/profile", auth([ROLES.ORGANIZATION]), async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
+
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -528,7 +527,7 @@ router.delete("/delete-account", auth(), async (req, res) => {
 
     res.json({ message: "Account deleted successfully" });
   } catch (err) {
-    console.error(err);
+
     res.status(500).json({ message: "Server error" });
   }
 });

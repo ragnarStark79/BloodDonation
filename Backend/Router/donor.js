@@ -15,14 +15,14 @@ const router = express.Router();
 router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
     try {
         const { lat, lng, km = 10, group, urgency } = req.query;
-        console.log(`[DonorAPI] /requests/nearby params: lat=${lat} lng=${lng} km=${km} group=${group}`);
+
 
         const user = await User.findById(req.user.userId);
         if (!user) return res.status(404).json({ message: "User not found" });
 
         // Eligibility check
         const eligible = isEligible(user.lastDonationDate) && user.eligible !== false;
-        console.log(`[DonorAPI] User ${user.Email} eligible: ${eligible} (Last: ${user.lastDonationDate})`);
+
 
         if (!eligible) {
             return res.status(200).json({
@@ -33,7 +33,7 @@ router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
         }
 
         const bloodGroup = group || user.bloodGroup || user.Bloodgroup; // Fallback to user group
-        console.log(`[DonorAPI] Searching for bloodGroup: ${bloodGroup}`);
+
 
         // Build base query - only filter by blood group if explicitly requested
         // Show OPEN requests and ASSIGNED requests (so donors can see what they're assigned to)
@@ -72,10 +72,10 @@ router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
                     isAssignedToMe: req.assignedTo?.donorId?.toString() === user._id.toString() || false
                 }));
 
-            console.log(`[DonorAPI] Found ${requests.length} requests with geolocation`);
+
         } else {
             // Otherwise just return by blood group (no distance filtering)
-            console.log(`[DonorAPI] No location provided, returning all matching blood group requests`);
+
             requests = await Request.find(query)
                 .populate("organizationId", "organizationName Name") // Populate to check if exists
                 .sort({ urgency: -1, createdAt: -1 })
@@ -91,7 +91,7 @@ router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
                     isAssignedToMe: req.assignedTo?.donorId?.toString() === user._id.toString() || false
                 }));
 
-            console.log(`[DonorAPI] Found ${requests.length} requests by blood group only`);
+
         }
 
         res.json({
@@ -99,7 +99,7 @@ router.get("/requests/nearby", auth([ROLES.DONOR]), async (req, res) => {
             requests,
         });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -122,7 +122,7 @@ router.post("/requests/:id/interest", auth([ROLES.DONOR]), async (req, res) => {
 
         res.json({ message: "Interest marked" });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -135,7 +135,7 @@ router.get("/appointments", auth([ROLES.DONOR]), async (req, res) => {
             .lean();
         res.json(appts);
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -144,7 +144,7 @@ router.get("/appointments", auth([ROLES.DONOR]), async (req, res) => {
 router.post("/appointments", auth([ROLES.DONOR]), async (req, res) => {
     try {
         const { organizationId, dateTime, requestId } = req.body;
-        console.log('[DONOR] Booking appointment:', { organizationId, dateTime, requestId, donorId: req.user.userId });
+
 
         if (!organizationId || !dateTime) {
             return res.status(400).json({ message: "organizationId and dateTime are required" });
@@ -153,7 +153,7 @@ router.post("/appointments", auth([ROLES.DONOR]), async (req, res) => {
         // Validate organizationId exists
         const org = await User.findById(organizationId);
         if (!org) {
-            console.error('[DONOR] Organization not found:', organizationId);
+
             return res.status(404).json({ message: "Organization not found" });
         }
 
@@ -164,10 +164,10 @@ router.post("/appointments", auth([ROLES.DONOR]), async (req, res) => {
             dateTime,
         });
 
-        console.log('[DONOR] Appointment created successfully:', appt._id);
+
         res.status(201).json(appt);
     } catch (err) {
-        console.error('[DONOR] Error creating appointment:', err);
+
         res.status(500).json({ message: "Server error", error: err.message });
     }
 });
@@ -204,7 +204,7 @@ router.get("/history", auth([ROLES.DONOR]), async (req, res) => {
         const total = appts.length;
         res.json({ total, appts });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -218,7 +218,7 @@ router
             if (!user) return res.status(404).json({ message: "User not found" });
             res.json(user);
         } catch (err) {
-            console.error(err);
+
             res.status(500).json({ message: "Server error" });
         }
     })
@@ -255,7 +255,7 @@ router
             const user = await User.findByIdAndUpdate(req.user.userId, update, { new: true }).lean();
             res.json(user);
         } catch (err) {
-            console.error(err);
+
             res.status(500).json({ message: "Server error" });
         }
     });
@@ -306,7 +306,7 @@ router.post("/profile-update", auth([ROLES.DONOR]), async (req, res) => {
 
         res.status(201).json({ message: "Update request submitted for approval." });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -357,7 +357,7 @@ router.get("/stats", auth([ROLES.DONOR]), async (req, res) => {
             recent
         });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -384,7 +384,7 @@ router.get("/me", auth([ROLES.DONOR]), async (req, res) => {
             donationCount
         });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -412,7 +412,7 @@ router.get("/donations/recent", auth([ROLES.DONOR]), async (req, res) => {
 
         res.json(formatted);
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -438,7 +438,7 @@ router.put("/appointments/:id/cancel", auth([ROLES.DONOR]), async (req, res) => 
 
         res.json({ message: "Appointment cancelled", appointment });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -471,7 +471,7 @@ router.put("/appointments/:id/reschedule", auth([ROLES.DONOR]), async (req, res)
 
         res.json({ message: "Appointment rescheduled", appointment });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -513,7 +513,7 @@ router.get("/camps", auth([ROLES.DONOR]), async (req, res) => {
 
         res.json(enrichedCamps);
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -544,7 +544,7 @@ router.post("/camps/:id/register", auth([ROLES.DONOR]), async (req, res) => {
 
         res.json({ message: "Successfully registered for camp", camp });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -563,7 +563,7 @@ router.delete("/camps/:id/unregister", auth([ROLES.DONOR]), async (req, res) => 
 
         res.json({ message: "Registration cancelled successfully" });
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -578,7 +578,7 @@ router.get("/my-camps", auth([ROLES.DONOR]), async (req, res) => {
 
         res.json(camps);
     } catch (err) {
-        console.error(err);
+
         res.status(500).json({ message: "Server error" });
     }
 });
