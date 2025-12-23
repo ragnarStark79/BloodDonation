@@ -20,7 +20,11 @@ import donationRoutes from "./Router/donation.js";
 import appointmentRoutes from "./Router/appointments.js";
 
 const app = express();
+console.log("----------------------------------------");
+console.log("SERVER STARTING - REVISION 3 - DEBUG MODE");
+console.log("----------------------------------------");
 
+// CORS configuration - consolidated to avoid conflicts
 app.use(
   cors({
     origin: [
@@ -37,20 +41,20 @@ app.use(helmet());
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(
-  cors({
-    origin: env.corsOrigin,
-    credentials: true,
-  })
-);
 app.use(morgan(env.env === "production" ? "combined" : "dev"));
 
-// Basic rate limit for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: env.rateLimitWindowMs,
-  max: env.rateLimitMax,
+// Global request logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} from ${req.headers.origin}`);
+  next();
 });
-app.use(["/api/login", "/api/signup"], authLimiter);
+
+// Basic rate limit for auth endpoints
+// const authLimiter = rateLimit({
+//   windowMs: env.rateLimitWindowMs,
+//   max: env.rateLimitMax,
+// });
+// app.use(["/api/login", "/api/signup"], authLimiter);
 
 connectdb();
 

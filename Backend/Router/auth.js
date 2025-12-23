@@ -184,21 +184,27 @@ router.post("/login", async (req, res) => {
 
     const { legacy, canonical } = mapIncomingRole(Role);
     // Legacy support: if canonical role is DONOR, allow user role to be "donar" or "donor"
-    const userRole = (user.Role || "").toLowerCase();
+    const userRole = (user.Role || "").toLowerCase().trim();
     const isValidDonor = canonical === ROLES.DONOR && (userRole === "donar" || userRole === "donor");
 
+    // Allow 'hospital', 'bloodbank', AND 'organization' as valid roles for Organization login
+    const isValidOrg = (canonical === "ORGANIZATION") && (userRole === "hospital" || userRole === "bloodbank" || userRole === "organization");
+    const isValidAdmin = canonical === ROLES.ADMIN && (userRole === "admin");
 
-
-    if (!isValidDonor && userRole !== legacy) {
-      return res.status(403).json({ msg: "Role does not match! Please select correct role." });
+    if (!isValidDonor && !isValidOrg && !isValidAdmin && userRole !== legacy) {
+      return res.status(403).json({
+        msg: "Role does not match! Please select correct role."
+      });
     }
 
     if (user.accountStatus === ACCOUNT_STATUS.BLOCKED || user.accountStatus === ACCOUNT_STATUS.DELETED) {
+      console.log("Login Failed: Account status is", user.accountStatus);
       return res.status(403).json({ msg: "Account is blocked or deleted" });
     }
 
     const isMatch = await bcrypt.compare(Password, user.Password);
     if (!isMatch) {
+      console.log("Login Failed: Password mismatch");
       return res.status(400).json({ msg: "Invalid Email or password" });
     }
 
@@ -508,9 +514,6 @@ router.put("/profile", auth([ROLES.ORGANIZATION]), async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
-// Real implementation follows in next tool call after I add the import.
-
 
 // Delete Account (Soft Delete)
 router.delete("/delete-account", auth(), async (req, res) => {

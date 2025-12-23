@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
 const client = axios.create({
   baseURL: API_BASE,
-  withCredentials: false,
+  withCredentials: true,
 });
 
 client.interceptors.request.use((config) => {
