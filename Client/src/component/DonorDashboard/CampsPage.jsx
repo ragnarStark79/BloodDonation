@@ -64,8 +64,18 @@ const CampsPage = () => {
 
     const handleRegister = async (campId) => {
         try {
-            await client.post(`/api/donor/camps/${campId}/register`);
-            toast.success("Successfully registered for the camp!");
+            const res = await client.post(`/api/donor/camps/${campId}/register`);
+            const { appointment } = res.data;
+
+            if (appointment) {
+                toast.success(
+                    `Successfully registered! Your appointment is scheduled for ${format(new Date(appointment.dateTime), "PPP 'at' p")}`,
+                    { duration: 5000 }
+                );
+            } else {
+                toast.success("Successfully registered for the camp!");
+            }
+
             fetchCamps(userLocation?.lat, userLocation?.lng);
         } catch (err) {
             toast.error(err.response?.data?.message || "Failed to register");

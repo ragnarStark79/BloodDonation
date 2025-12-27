@@ -21,10 +21,28 @@ router.get("/", adminOrOrg, async (req, res) => {
         });
 
         // Filter by organization for non-admin users
-        // Exclude 'stored' (blood bank inventory) and 'used' (hospital patient use)
-        const query = { status: { $in: ["active", "completed"] } };
+        // Blood banks: Exclude 'stored' donations (auto-added to inventory)
+        // Hospitals: Show both 'active' and 'completed' (pipeline works fine)
+        const query = {};
+
         if (req.user.role !== ROLES.ADMIN) {
             query.organizationId = req.user.userId;
+
+            // Get organization type to apply correct filtering
+            const User = (await import("../modules/User.js")).default;
+            const org = await User.findById(req.user.userId).select("organizationType").lean();
+
+            if (org?.organizationType === "BANK") {
+                // BLOOD BANK: Exclude 'stored' status to prevent completed donations from looping back
+                // When donations reach ready-storage, they get status='stored' and should disappear
+                query.status = { $nin: ["stored", "rejected", "aborted"] };
+            } else {
+                // HOSPITAL: Keep original behavior (working fine)
+                query.status = { $in: ["active", "completed"] };
+            }
+        } else {
+            // Admin: Show all active and completed
+            query.status = { $in: ["active", "completed"] };
         }
 
         const donations = await Donation.find(query)
@@ -83,7 +101,7 @@ router.get("/", adminOrOrg, async (req, res) => {
                 campParticipantId: donation.campParticipantId,
                 screening: donation.screening,
                 screeningStatus: donation.screeningStatus,
-                collection: donation.collection,
+                collectionData: donation.collectionData,
                 labTests: donation.labTests,
             };
 
@@ -282,7 +300,7 @@ router.put("/:id/screening", adminOrOrg, async (req, res) => {
 router.put("/:id/collection", adminOrOrg, async (req, res) => {
     try {
         const { id } = req.params;
-        const { bloodBagIdGenerated, volumeCollected, componentType, collectionStartTime, collectionEndTime, donationBed, notes } = req.body;
+        const { bloodBagIdGenerated, volumeCollected, unitsCollected, componentType, collectionStartTime, collectionEndTime, donationBed, notes } = req.body;
 
         const donation = await Donation.findById(id);
         if (!donation) {
@@ -294,16 +312,26 @@ router.put("/:id/collection", adminOrOrg, async (req, res) => {
             return res.status(403).json({ message: "Not authorized to update this donation" });
         }
 
+        // Debug: Log the received unitsCollected value
+        console.log('🔍 Collection Data Received:', {
+            unitsCollected,
+            volumeCollected,
+            bloodBagIdGenerated
+        });
+
         // Update collection data
-        donation.collection = {
+        donation.collectionData = {
             bloodBagIdGenerated,
             volumeCollected,
+            unitsCollected: unitsCollected || 1,
             componentType,
             collectionStartTime,
             collectionEndTime,
             collectedBy: req.user.userId,
             donationBed,
         };
+
+        console.log('✅ Collection Object Saved:', donation.collectionData);
 
         // Add history entry
         const duration = collectionEndTime && collectionStartTime
@@ -315,7 +343,7 @@ router.put("/:id/collection", adminOrOrg, async (req, res) => {
             action: "Blood collection completed",
             performedBy: req.user.userId,
             performedAt: new Date(),
-            notes: `${volumeCollected}ml ${componentType} collected in ${duration} minutes. Bag ID: ${bloodBagIdGenerated}${notes ? '. ' + notes : ''}`
+            notes: `${unitsCollected || 1} unit(s) - ${volumeCollected}ml ${componentType} collected in ${duration} minutes. Bag ID: ${bloodBagIdGenerated}${notes ? '. ' + notes : ''}`
         });
 
         await donation.save();
@@ -324,7 +352,7 @@ router.put("/:id/collection", adminOrOrg, async (req, res) => {
             message: "Blood collection data updated successfully",
             donation: {
                 id: donation._id.toString(),
-                collection: donation.collection,
+                collectionData: donation.collectionData,
             },
         });
     } catch (error) {
@@ -456,7 +484,8 @@ router.put("/:id/lab-tests", adminOrOrg, async (req, res) => {
             failedTests: allTestsPassed ? [] : failedTests
         });
     } catch (error) {
-
+        console.error('❌ Lab Tests Error:', error);
+        console.error('Error Stack:', error.stack);
         res.status(500).json({ message: "Server error", error: error.message });
     }
 });

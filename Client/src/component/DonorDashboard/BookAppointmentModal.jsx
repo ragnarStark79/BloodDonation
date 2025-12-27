@@ -24,6 +24,13 @@ const BookAppointmentModal = ({ isOpen, onClose, request, onSuccess }) => {
     const [submitting, setSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
 
+    // Organization search state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [organizations, setOrganizations] = useState([]);
+    const [selectedOrg, setSelectedOrg] = useState(null);
+    const [searching, setSearching] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+
     // Reset form when modal opens
     useEffect(() => {
         if (isOpen) {
@@ -40,8 +47,36 @@ const BookAppointmentModal = ({ isOpen, onClose, request, onSuccess }) => {
                 organizationInfo: ''
             });
             setErrors({});
+            setSearchQuery('');
+            setOrganizations([]);
+            setSelectedOrg(null);
+            setShowDropdown(false);
         }
     }, [isOpen]);
+
+    // Debounced organization search
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (searchQuery.length >= 2 && !request) {
+                setSearching(true);
+                try {
+                    const results = await donorApi.searchOrganizations(searchQuery);
+                    setOrganizations(results);
+                    setShowDropdown(true);
+                } catch (error) {
+                    console.error('Failed to search organizations:', error);
+                    setOrganizations([]);
+                } finally {
+                    setSearching(false);
+                }
+            } else {
+                setOrganizations([]);
+                setShowDropdown(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, request]);
 
     if (!isOpen) return null;
 
@@ -76,7 +111,7 @@ const BookAppointmentModal = ({ isOpen, onClose, request, onSuccess }) => {
         }
 
         // Check if we have organizationId
-        const orgId = request?.organizationId?._id || request?.organizationId || formData.organizationId;
+        const orgId = request?.organizationId?._id || request?.organizationId || selectedOrg?._id || formData.organizationId;
 
 
         if (!orgId) {
@@ -192,29 +227,106 @@ const BookAppointmentModal = ({ isOpen, onClose, request, onSuccess }) => {
                             </div>
                         )}
 
-                        {/* Organization Info (for standalone booking) */}
+                        {/* Organization Search (for standalone booking) */}
                         {!request && (
-                            <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
                                 <div className="flex items-start gap-3 mb-3">
-                                    <Building2 className="w-5 h-5 text-amber-600 mt-0.5" />
+                                    <Building2 className="w-5 h-5 text-blue-600 mt-0.5" />
                                     <div>
-                                        <h4 className="font-semibold text-gray-900 text-sm">Standalone Appointment</h4>
+                                        <h4 className="font-semibold text-gray-900 text-sm">Select Hospital/Blood Bank</h4>
                                         <p className="text-xs text-gray-600 mt-0.5">
-                                            Enter hospital/blood bank information below
+                                            Search by name or city
                                         </p>
                                     </div>
                                 </div>
-                                <input
-                                    type="text"
-                                    value={formData.organizationInfo}
-                                    onChange={(e) => setFormData({ ...formData, organizationInfo: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
-                                    placeholder="Enter hospital/blood bank name and contact..."
-                                    required={!request}
-                                />
-                                <p className="text-xs text-amber-700 mt-2">
-                                    Note: For best results, book appointments through blood requests.
-                                </p>
+
+                                {/* Search Input */}
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={selectedOrg ? selectedOrg.organizationName || selectedOrg.Name : searchQuery}
+                                        onChange={(e) => {
+                                            setSearchQuery(e.target.value);
+                                            setSelectedOrg(null);
+                                        }}
+                                        onFocus={() => searchQuery.length >= 2 && setShowDropdown(true)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                        placeholder="Type to search hospitals or blood banks..."
+                                        required={!request}
+                                    />
+                                    {searching && (
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                                        </div>
+                                    )}
+
+                                    {/* Dropdown Results */}
+                                    {showDropdown && organizations.length > 0 && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                            {organizations.map((org) => (
+                                                <button
+                                                    key={org._id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedOrg(org);
+                                                        setSearchQuery('');
+                                                        setShowDropdown(false);
+                                                        setFormData({ ...formData, organizationId: org._id });
+                                                    }}
+                                                    className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b border-gray-100 last:border-0 transition flex items-start gap-3"
+                                                >
+                                                    <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                                        {org.organizationType === 'HOSPITAL' ? '🏥' : '🩸'}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="font-semibold text-gray-800 text-sm truncate">
+                                                            {org.organizationName || org.Name}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            {org.City}, {org.State} • {org.organizationType === 'HOSPITAL' ? 'Hospital' : 'Blood Bank'}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* No Results */}
+                                    {showDropdown && !searching && searchQuery.length >= 2 && organizations.length === 0 && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                                            No organizations found. Try a different search term.
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Selected Organization Display */}
+                                {selectedOrg && (
+                                    <div className="mt-3 p-3 bg-white rounded-lg border border-blue-200">
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-start gap-2">
+                                                <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                                                <div>
+                                                    <div className="font-semibold text-gray-800 text-sm">
+                                                        {selectedOrg.organizationName || selectedOrg.Name}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 mt-0.5">
+                                                        {selectedOrg.City}, {selectedOrg.State}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedOrg(null);
+                                                    setFormData({ ...formData, organizationId: '' });
+                                                }}
+                                                className="text-gray-400 hover:text-gray-600"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 

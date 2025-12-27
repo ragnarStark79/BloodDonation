@@ -5,6 +5,7 @@ const appointmentSchema = new mongoose.Schema(
     donorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     organizationId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     requestId: { type: mongoose.Schema.Types.ObjectId, ref: "Request" },
+    campId: { type: mongoose.Schema.Types.ObjectId, ref: "Camp" }, // Link to donation camp
     dateTime: { type: Date, required: true },
     status: {
       type: String,

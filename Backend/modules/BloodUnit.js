@@ -10,6 +10,10 @@ const bloodUnitSchema = new mongoose.Schema(
     status: { type: String, enum: ["AVAILABLE", "RESERVED", "ISSUED", "EXPIRED"], default: "AVAILABLE" },
     barcode: { type: String },
 
+    // Source tracking
+    donorId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    donationId: { type: mongoose.Schema.Types.ObjectId, ref: "Donation" },
+
     // Reservation tracking
     reservedFor: { type: mongoose.Schema.Types.ObjectId, ref: "Request" },
     reservedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

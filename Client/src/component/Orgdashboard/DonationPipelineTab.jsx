@@ -117,20 +117,25 @@ const DonationPipelineTab = () => {
             // Convert UPCOMING appointments to NEW DONORS
             // User feedback: "user will come in new donar when time is 9"
             // We only show them once the appointment time has arrived or passed
+            // IMPORTANT: Exclude appointments that have been completed/collected to prevent duplicates
             const upcomingAppointments = appointmentsArray
                 .filter(apt => {
                     const status = (apt.status || '').toUpperCase();
-                    const isUpcoming = status === 'UPCOMING';
                     const aptId = apt._id?.toString() || apt.id?.toString();
                     const notExisting = !existingDonationIds.has(aptId);
 
                     const apptTime = new Date(apt.dateTime);
                     const isArrived = apptTime <= new Date();
 
+                    // Exclude appointments that have been processed (completed, collected, rejected, cancelled)
+                    const isProcessed = ['COLLECTED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(status);
 
-                    if (notExisting && isUpcoming && !isArrived) {
+                    if (isProcessed) {
+                        return false; // Don't show processed appointments
                     }
 
+                    // Only show UPCOMING appointments that have arrived and don't have donations yet
+                    const isUpcoming = status === 'UPCOMING';
                     return isUpcoming && notExisting && isArrived;
                 })
                 .map(apt => ({
@@ -600,23 +605,23 @@ const DonationPipelineTab = () => {
                                                                     </div>
                                                                 )}
 
-                                                                {col.id === 'in-progress' && it.collection?.bloodBagIdGenerated && (
+                                                                {col.id === 'in-progress' && it.collectionData?.bloodBagIdGenerated && (
                                                                     <div className="space-y-1 mb-2">
                                                                         <div className="text-[10px] font-mono bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                                                                            🏷️ {it.collection.bloodBagIdGenerated}
+                                                                            🏷️ {it.collectionData.bloodBagIdGenerated}
                                                                         </div>
-                                                                        {it.collection.volumeCollected && (
+                                                                        {it.collectionData.volumeCollected && (
                                                                             <div className="text-[10px] text-gray-600">
-                                                                                💉 {it.collection.volumeCollected}ml {it.collection.componentType}
+                                                                                💉 {it.collectionData.volumeCollected}ml {it.collectionData.componentType}
                                                                             </div>
                                                                         )}
                                                                     </div>
                                                                 )}
 
-                                                                {col.id === 'completed' && it.collection?.bloodBagIdGenerated && (
+                                                                {col.id === 'completed' && it.collectionData?.bloodBagIdGenerated && (
                                                                     <div className="space-y-1 mb-2">
                                                                         <div className="text-[10px] font-mono bg-green-100 text-green-800 px-2 py-1 rounded truncate">
-                                                                            🏷️ {it.collection.bloodBagIdGenerated}
+                                                                            🏷️ {it.collectionData.bloodBagIdGenerated}
                                                                         </div>
                                                                         {it.labTests?.allTestsPassed !== undefined ? (
                                                                             <div className={`text-[10px] font-bold ${it.labTests.allTestsPassed ? 'text-green-600' : 'text-red-600'
@@ -631,10 +636,10 @@ const DonationPipelineTab = () => {
                                                                     </div>
                                                                 )}
 
-                                                                {col.id === 'ready-storage' && it.collection?.bloodBagIdGenerated && (
+                                                                {col.id === 'ready-storage' && it.collectionData?.bloodBagIdGenerated && (
                                                                     <div className="space-y-1 mb-2">
                                                                         <div className="text-[10px] font-mono bg-purple-100 text-purple-800 px-2 py-1 rounded truncate">
-                                                                            🏷️ {it.collection.bloodBagIdGenerated}
+                                                                            🏷️ {it.collectionData.bloodBagIdGenerated}
                                                                         </div>
                                                                         <div className="text-[10px] text-purple-600 font-bold">
                                                                             ✓ Ready for Inventory

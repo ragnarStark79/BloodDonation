@@ -79,27 +79,11 @@ const BloodBankDonationPipeline = () => {
 
     const fetchDonations = async () => {
         try {
-            // Blood banks fetch: appointments, donations, AND camp participants
-            // Hospitals fetch: appointments and donations only
-            const isBloodBank = user?.organizationType === 'BANK';
-
-            const promises = [
+            // Fetch appointments and donations
+            const [appointmentsData, donationsData] = await Promise.all([
                 orgApi.getAppointments(),
                 adminApi.getDonations().catch(() => ({ 'new-donors': { items: [] }, 'screening': { items: [] }, 'in-progress': { items: [] }, 'completed': { items: [] }, 'ready-storage': { items: [] } }))
-            ];
-
-            // Only blood banks can have donation camps
-            if (isBloodBank) {
-                promises.push(orgApi.getCampParticipants().catch(() => []));
-            }
-
-            const results = await Promise.all(promises);
-            const appointmentsData = results[0];
-            const donationsData = results[1];
-            const campParticipants = isBloodBank ? results[2] : [];
-
-            if (isBloodBank) {
-            }
+            ]);
 
             // Handle both response formats for appointments
             const appointmentsArray = Array.isArray(appointmentsData)
@@ -133,20 +117,25 @@ const BloodBankDonationPipeline = () => {
             // Convert UPCOMING appointments to NEW DONORS
             // User feedback: "user will come in new donar when time is 9"
             // We only show them once the appointment time has arrived or passed
+            // IMPORTANT: Exclude appointments that have been completed/collected to prevent duplicates
             const upcomingAppointments = appointmentsArray
                 .filter(apt => {
                     const status = (apt.status || '').toUpperCase();
-                    const isUpcoming = status === 'UPCOMING';
                     const aptId = apt._id?.toString() || apt.id?.toString();
                     const notExisting = !existingDonationIds.has(aptId);
 
                     const apptTime = new Date(apt.dateTime);
                     const isArrived = apptTime <= new Date();
 
+                    // Exclude appointments that have been processed (completed, collected, rejected, cancelled)
+                    const isProcessed = ['COLLECTED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(status);
 
-                    if (notExisting && isUpcoming && !isArrived) {
+                    if (isProcessed) {
+                        return false; // Don't show processed appointments
                     }
 
+                    // Only show UPCOMING appointments that have arrived and don't have donations yet
+                    const isUpcoming = status === 'UPCOMING';
                     return isUpcoming && notExisting && isArrived;
                 })
                 .map(apt => ({
@@ -169,29 +158,6 @@ const BloodBankDonationPipeline = () => {
                 }));
 
 
-            // Convert Camp Participants to NEW DONORS (BLOOD BANKS ONLY)
-            // This follows the same pattern as appointments in hospital pipeline
-            const campItems = isBloodBank ? (campParticipants || [])
-                .filter(p => !existingDonationIds.has(`${p._id}_${p.campId}`))
-                .map(p => ({
-                    id: `${p._id}_${p.campId}`,
-                    donorId: p._id,
-                    name: p.Name,
-                    group: p.bloodGroup,
-                    phone: p.PhoneNumber || 'Not provided',
-                    email: p.Email,
-                    date: new Date(),
-                    isToday: true,
-                    notes: `From Camp: ${p.campTitle}`,
-                    stage: 'new-donors',
-                    status: 'Active',
-                    campParticipantId: `${p._id}_${p.campId}`,
-                    campId: p.campId,
-                    fromCamp: true,
-                    isAttended: p.isAttended
-                })) : [];
-
-
             // Add isToday flag to all existing donations from backend
             Object.keys(donationsByStage).forEach(stage => {
                 if (donationsByStage[stage].items) {
@@ -202,14 +168,14 @@ const BloodBankDonationPipeline = () => {
                 }
             });
 
-            // Merge everything into columns (same as hospital: appointments + existing donations)
-            // Blood banks also include camp participants
+            // Merge everything into columns
+            // Camp participants will only appear when they have appointments (not directly)
             const newColumns = {
                 'new-donors': {
                     id: 'new-donors',
                     title: 'NEW DONORS',
                     color: 'from-red-50 to-red-100/50',
-                    items: [...upcomingAppointments, ...campItems, ...(donationsByStage['new-donors']?.items || [])]
+                    items: [...upcomingAppointments, ...(donationsByStage['new-donors']?.items || [])]
                 },
                 'screening': donationsByStage['screening'] || { id: 'screening', title: 'SCREENING', color: 'from-blue-50 to-blue-100/50', items: [] },
                 'in-progress': donationsByStage['in-progress'] || { id: 'in-progress', title: 'IN PROGRESS', color: 'from-yellow-50 to-yellow-100/50', items: [] },
@@ -646,23 +612,23 @@ const BloodBankDonationPipeline = () => {
                                                                     </div>
                                                                 )}
 
-                                                                {col.id === 'in-progress' && it.collection?.bloodBagIdGenerated && (
+                                                                {col.id === 'in-progress' && it.collectionData?.bloodBagIdGenerated && (
                                                                     <div className="space-y-1 mb-2">
                                                                         <div className="text-[10px] font-mono bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                                                                            🏷️ {it.collection.bloodBagIdGenerated}
+                                                                            🏷️ {it.collectionData.bloodBagIdGenerated}
                                                                         </div>
-                                                                        {it.collection.volumeCollected && (
+                                                                        {it.collectionData.volumeCollected && (
                                                                             <div className="text-[10px] text-gray-600">
-                                                                                💉 {it.collection.volumeCollected}ml {it.collection.componentType}
+                                                                                💉 {it.collectionData.volumeCollected}ml {it.collectionData.componentType}
                                                                             </div>
                                                                         )}
                                                                     </div>
                                                                 )}
 
-                                                                {col.id === 'completed' && it.collection?.bloodBagIdGenerated && (
+                                                                {col.id === 'completed' && it.collectionData?.bloodBagIdGenerated && (
                                                                     <div className="space-y-1 mb-2">
                                                                         <div className="text-[10px] font-mono bg-green-100 text-green-800 px-2 py-1 rounded truncate">
-                                                                            🏷️ {it.collection.bloodBagIdGenerated}
+                                                                            🏷️ {it.collectionData.bloodBagIdGenerated}
                                                                         </div>
                                                                         {it.labTests?.allTestsPassed !== undefined ? (
                                                                             <div className={`text-[10px] font-bold ${it.labTests.allTestsPassed ? 'text-green-600' : 'text-red-600'
@@ -677,10 +643,10 @@ const BloodBankDonationPipeline = () => {
                                                                     </div>
                                                                 )}
 
-                                                                {col.id === 'ready-storage' && it.collection?.bloodBagIdGenerated && (
+                                                                {col.id === 'ready-storage' && it.collectionData?.bloodBagIdGenerated && (
                                                                     <div className="space-y-1 mb-2">
                                                                         <div className="text-[10px] font-mono bg-purple-100 text-purple-800 px-2 py-1 rounded truncate">
-                                                                            🏷️ {it.collection.bloodBagIdGenerated}
+                                                                            🏷️ {it.collectionData.bloodBagIdGenerated}
                                                                         </div>
                                                                         <div className="text-[10px] text-purple-600 font-bold">
                                                                             ✓ Ready for Inventory

@@ -127,11 +127,49 @@ router.post("/requests/:id/interest", auth([ROLES.DONOR]), async (req, res) => {
     }
 });
 
+// Search organizations (hospitals/blood banks) for booking appointments
+router.get("/organizations/search", auth([ROLES.DONOR]), async (req, res) => {
+    try {
+        const { query, type } = req.query;
+
+        if (!query || query.length < 2) {
+            return res.json([]);
+        }
+
+        // Build search criteria - match both 'organization' and 'hospital' roles
+        // Real users register with Role='hospital', legacy data may have 'organization'
+        const searchCriteria = {
+            Role: { $in: ['hospital', 'organization', 'HOSPITAL', 'ORGANIZATION'] },
+            organizationType: { $in: ['HOSPITAL', 'BANK'] },  // Must be hospital or blood bank
+            $or: [
+                { Name: { $regex: query, $options: 'i' } },
+                { organizationName: { $regex: query, $options: 'i' } },
+                { City: { $regex: query, $options: 'i' } }
+            ]
+        };
+
+        // Filter by specific organization type if requested
+        if (type && (type === 'HOSPITAL' || type === 'BANK')) {
+            searchCriteria.organizationType = type;
+        }
+
+        const organizations = await User.find(searchCriteria)
+            .select('Name organizationName City State organizationType Email Phone')
+            .limit(10)
+            .lean();
+
+        res.json(organizations);
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
 // Donor appointments list
 router.get("/appointments", auth([ROLES.DONOR]), async (req, res) => {
     try {
         const appts = await Appointment.find({ donorId: req.user.userId })
             .populate("organizationId", "Name Email")
+            .populate("campId", "title date location")
             .lean();
         res.json(appts);
     } catch (err) {
@@ -539,10 +577,42 @@ router.post("/camps/:id/register", auth([ROLES.DONOR]), async (req, res) => {
             return res.status(400).json({ message: "Camp is already full" });
         }
 
+        // Add donor to camp
         camp.registeredDonors.push(donorId);
         await camp.save();
 
-        res.json({ message: "Successfully registered for camp", camp });
+        // Automatically create appointment for the camp
+        const campDateTime = new Date(camp.date);
+
+        // Parse start time (format: "HH:MM")
+        if (camp.startTime) {
+            const [hours, minutes] = camp.startTime.split(':').map(Number);
+            campDateTime.setHours(hours, minutes, 0, 0);
+        } else {
+            // Default to 9:00 AM if no start time
+            campDateTime.setHours(9, 0, 0, 0);
+        }
+
+        const appointment = await Appointment.create({
+            donorId,
+            organizationId: camp.organizationId,
+            campId: id,
+            dateTime: campDateTime,
+            status: "UPCOMING",
+            createdBy: donorId,
+            createdByRole: "SYSTEM", // Indicates automatic creation
+            notes: `Automatically created from camp registration: ${camp.title}`
+        });
+
+        res.json({
+            message: "Successfully registered for camp",
+            camp,
+            appointment: {
+                _id: appointment._id,
+                dateTime: appointment.dateTime,
+                status: appointment.status
+            }
+        });
     } catch (err) {
 
         res.status(500).json({ message: "Server error" });
@@ -560,6 +630,17 @@ router.delete("/camps/:id/unregister", auth([ROLES.DONOR]), async (req, res) => 
 
         camp.registeredDonors = camp.registeredDonors.filter(id => id.toString() !== donorId);
         await camp.save();
+
+        // Cancel associated appointment
+        await Appointment.findOneAndUpdate(
+            { campId: id, donorId, status: "UPCOMING" },
+            {
+                status: "CANCELLED",
+                cancellationReason: "Unregistered from camp",
+                cancelledBy: donorId,
+                cancelledAt: new Date()
+            }
+        );
 
         res.json({ message: "Registration cancelled successfully" });
     } catch (err) {

@@ -7,6 +7,7 @@ const BloodCollectionModal = ({ donation, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         bloodBagIdGenerated: '',
         volumeCollected: 450,
+        unitsCollected: 1,
         componentType: 'Whole Blood',
         collectionStartTime: '',
         collectionEndTime: '',
@@ -70,6 +71,9 @@ const BloodCollectionModal = ({ donation, onClose, onSuccess }) => {
 
         setSaving(true);
         try {
+            // Debug: Log the form data being sent
+            console.log('📤 Sending Collection Data:', formData);
+
             // Save collection data
             await adminApi.updateDonationCollection(donation.id, formData);
 
@@ -133,8 +137,8 @@ const BloodCollectionModal = ({ donation, onClose, onSuccess }) => {
                     <p className="text-xs text-gray-500 mt-1">Auto-generated, can be edited if needed</p>
                 </div>
 
-                {/* Volume and Component Type */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Volume, Units, and Component Type */}
+                <div className="grid grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Volume Collected (ml) *
@@ -149,6 +153,26 @@ const BloodCollectionModal = ({ donation, onClose, onSuccess }) => {
                             required
                         />
                         <p className="text-xs text-gray-500 mt-1">Range: 200-500 ml</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Units Collected *
+                        </label>
+                        <input
+                            type="number"
+                            value={formData.unitsCollected}
+                            onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                console.log('Units Collected Changed:', value);
+                                setFormData({ ...formData, unitsCollected: value });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-100 outline-none"
+                            min="1"
+                            max="10"
+                            required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Range: 1-10 units</p>
                     </div>
 
                     <div>

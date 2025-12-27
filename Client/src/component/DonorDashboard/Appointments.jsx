@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Clock, MapPin, Plus, Loader2, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, Plus, Loader2, X, Tent } from 'lucide-react';
 import LoadingSkeleton from '../common/LoadingSkeleton';
 import appointmentApi from '../../api/appointmentApi';
 import { toast } from 'sonner';
@@ -131,7 +131,17 @@ const Appointments = () => {
                                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
                                                     {apt.status || 'UPCOMING'}
                                                 </span>
+                                                {apt.campId && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 flex items-center gap-1">
+                                                        <Tent size={10} /> Camp
+                                                    </span>
+                                                )}
                                             </div>
+                                            {apt.campId && (
+                                                <p className="text-[10px] text-gray-400 mt-1 italic">
+                                                    {apt.campId.title}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 

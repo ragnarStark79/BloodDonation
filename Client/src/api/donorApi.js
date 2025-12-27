@@ -52,6 +52,18 @@ export const donorApi = {
     },
 
     /**
+     * Search organizations (hospitals/blood banks) for booking appointments
+     * @param {string} query - Search query (name or city)
+     * @param {string} type - Optional: 'HOSPITAL' or 'BANK'
+     */
+    searchOrganizations: async (query, type) => {
+        const params = { query };
+        if (type) params.type = type;
+        const res = await client.get(`${API_BASE}/api/donor/organizations/search`, { params });
+        return res.data;
+    },
+
+    /**
      * Book new appointment
      */
     bookAppointment: async (data) => {

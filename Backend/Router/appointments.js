@@ -48,10 +48,15 @@ router.post("/donor", donorAuth, async (req, res) => {
             return res.status(400).json({ message: "Organization and date/time are required" });
         }
 
-        // Verify organization exists
+        // Verify organization exists and is a valid type
         const org = await User.findById(organizationId);
-        if (!org || org.organizationType !== "BANK") {
-            return res.status(404).json({ message: "Organization not found or invalid type" });
+        if (!org) {
+            return res.status(404).json({ message: "Organization not found" });
+        }
+
+        // Accept both HOSPITAL and BANK types
+        if (!['HOSPITAL', 'BANK'].includes(org.organizationType)) {
+            return res.status(400).json({ message: "Invalid organization type - must be a hospital or blood bank" });
         }
 
         // Create appointment

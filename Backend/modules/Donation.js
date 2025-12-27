@@ -141,13 +141,19 @@ const donationSchema = new mongoose.Schema(
             },
         },
         // Blood collection data
-        collection: {
+        collectionData: {
             bloodBagIdGenerated: {
                 type: String,
             },
             volumeCollected: {
                 type: Number, // ml
                 default: 450,
+            },
+            unitsCollected: {
+                type: Number,
+                default: 1,
+                min: 1,
+                max: 10,
             },
             componentType: {
                 type: String,
@@ -210,11 +216,11 @@ const donationSchema = new mongoose.Schema(
                 default: false,
             },
         },
-        // Inventory link
-        inventoryItemId: {
+        // Inventory link (can be single ID or array of IDs for multiple units)
+        inventoryItemId: [{
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Inventory",
-        },
+            ref: "BloodUnit",
+        }],
         // Audit trail
         history: [
             {
@@ -286,13 +292,64 @@ donationSchema.methods.moveToStage = async function (newStage, performedBy, note
         // Auto-fulfill appointment and request
         await this.autoFulfillRequest();
 
-        // ✨ AUTO-HIDE FROM PIPELINE ✨
         const User = (await import("./User.js")).default;
         const org = await User.findById(this.organizationId).select("organizationType").lean();
 
         if (org && org.organizationType === "BANK") {
-            // BLOOD BANK: Mark as stored (will be added to inventory manually)
-            this.status = "stored";
+            // BLOOD BANK: Automatically add to inventory
+            try {
+                const BloodUnit = (await import("./BloodUnit.js")).default;
+
+                // Get number of units collected (default to 1 if not specified)
+                const unitsCollected = this.collectionData?.unitsCollected || 1;
+                const baseBarcode = this.collectionData?.bloodBagIdGenerated || this.bloodBagId || `BAG-${Date.now()}`;
+
+                console.log('🩸 Creating Blood Units:', {
+                    unitsCollected,
+                    collectionData: this.collectionData,
+                    baseBarcode
+                });
+
+                // Create multiple blood units based on unitsCollected
+                const bloodUnits = [];
+                for (let i = 0; i < unitsCollected; i++) {
+                    const unitBarcode = unitsCollected > 1 ? `${baseBarcode}-U${i + 1}` : baseBarcode;
+
+                    console.log(`Creating unit ${i + 1}/${unitsCollected} with barcode: ${unitBarcode}`);
+
+                    const bloodUnit = await BloodUnit.create({
+                        organizationId: this.organizationId,
+                        bloodGroup: this.bloodGroup,
+                        component: this.collectionData?.componentType || "Whole Blood",
+                        collectionDate: this.collectionData?.collectionEndTime || this.completedAt || new Date(),
+                        expiryDate: this.expiryDate,
+                        barcode: unitBarcode,
+                        status: "AVAILABLE",
+                        donorId: this.donorId,
+                        donationId: this._id
+                    });
+
+                    console.log(`✅ Created blood unit: ${bloodUnit._id}`);
+                    bloodUnits.push(bloodUnit._id);
+                }
+
+                console.log(`✅ Successfully created ${bloodUnits.length} blood units`);
+
+                // Link inventory items to donation (always store as array)
+                this.inventoryItemId = bloodUnits;
+                this.status = "stored";
+            } catch (error) {
+                console.error('❌ Error creating blood units:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    donationId: this._id,
+                    organizationId: this.organizationId,
+                    bloodGroup: this.bloodGroup,
+                    collectionData: this.collectionData
+                });
+                throw error; // Re-throw to be caught by the outer try-catch
+            }
         } else {
             // HOSPITAL: Mark as used (blood used on patient)
             this.status = "used";
