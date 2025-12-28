@@ -69,36 +69,31 @@ const UsersTable = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
-            {/* Header Section */}
-            <section className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6 p-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-800">
-                            User Management
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Manage donors, volunteers and admins.
-                        </p>
-                    </div>
-                    <div className="flex gap-3">
+            {/* Premium Header Banner */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-2xl mb-6">
+                <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-400/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+
+                <div className="relative p-6">
+                    <div className="flex items-center gap-4">
                         <div className="relative">
-                            <input
-                                value={search}
-                                onChange={(e) => {
-                                    setSearch(e.target.value);
-                                    setPage(1);
-                                }}
-                                placeholder="Search users..."
-                                className="px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm w-64 transition-all"
-                            />
-                            <Search className="w-4 h-4 text-gray-400 absolute right-3 top-2.5" />
+                            <div className="absolute inset-0 bg-white/20 rounded-2xl blur-sm"></div>
+                            <div className="relative w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 shadow-lg">
+                                <Settings className="text-white w-7 h-7" strokeWidth={2.5} />
+                            </div>
                         </div>
-                        <button className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-                            <Plus className="w-4 h-4" /> Add User
-                        </button>
+                        <div>
+                            <h3 className="text-2xl font-bold text-white drop-shadow-lg">
+                                User Management
+                            </h3>
+                            <p className="text-purple-100 text-sm mt-1">
+                                Manage donors, volunteers and admins • {total} total users
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </section>
+            </div>
 
             {/* Users Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -139,90 +134,104 @@ const UsersTable = () => {
                                         No users found
                                     </td>
                                 </tr>
-                            ) : users.map((u) => (
-                                <tr key={u._id} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center text-white font-bold text-sm shadow-md">
-                                                {u.Name?.split(" ").map(n => n[0]).slice(0, 2).join("") || "U"}
+                            ) : users.map((u) => {
+                                // Determine avatar gradient based on role
+                                const avatarGradient =
+                                    u.Role === 'Admin' || u.Role === 'admin' ? 'from-purple-500 to-indigo-600' :
+                                        u.Role === 'hospital' || u.Role === 'Hospital' ? 'from-red-500 to-orange-600' :
+                                            'from-blue-500 to-cyan-600'; // donor default
+
+                                // Determine role badge color
+                                const roleBadgeColor =
+                                    u.Role === 'Admin' || u.Role === 'admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                        u.Role === 'hospital' || u.Role === 'Hospital' ? 'bg-red-100 text-red-700 border-red-200' :
+                                            'bg-blue-100 text-blue-700 border-blue-200';
+
+                                return (
+                                    <tr key={u._id} className="hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-pink-50/50 transition-all duration-200 group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white font-bold text-sm shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-200`}>
+                                                    {u.Name?.split(" ").map(n => n[0]).slice(0, 2).join("") || "U"}
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-sm text-gray-900 group-hover:text-indigo-600 transition-colors">{u.Name}</p>
+                                                    <p className="text-xs text-gray-500">{u.Email}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-medium text-sm text-gray-900">{u.Name}</p>
-                                                <p className="text-xs text-gray-400">{u.Email}</p>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${roleBadgeColor}`}>
+                                                {u.Role === "Admin" && <Settings className="w-3.5 h-3.5" />}
+                                                {u.Role}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border ${u.accountStatus === 'BLOCKED'
+                                                ? 'bg-red-50 text-red-700 border-red-200'
+                                                : 'bg-green-50 text-green-700 border-green-200'
+                                                }`}>
+                                                <span className={`w-2 h-2 rounded-full mr-2 ${u.accountStatus === 'BLOCKED' ? 'bg-red-500' : 'bg-green-500 animate-pulse'
+                                                    }`}></span>
+                                                {u.accountStatus || 'ACTIVE'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border ${u.verificationStatus === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                u.verificationStatus === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                    'bg-amber-50 text-amber-700 border-amber-200'
+                                                }`}>
+                                                {u.verificationStatus || 'N/A'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => handleBlockUnblock(u._id, u.accountStatus)}
+                                                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm hover:shadow-md ${u.accountStatus === 'BLOCKED'
+                                                        ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
+                                                        : 'bg-gradient-to-r from-red-500 to-orange-600 text-white hover:from-red-600 hover:to-orange-700'
+                                                        }`}
+                                                >
+                                                    {u.accountStatus === 'BLOCKED' ? 'Unblock' : 'Block'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(u._id, u.Name)}
+                                                    className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all border border-transparent hover:border-red-200 hover:shadow-sm"
+                                                    title="Delete user"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                                            {u.Role === "Admin" && <Settings className="w-3 h-3" />}
-                                            {u.Role}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${u.accountStatus === 'BLOCKED'
-                                            ? 'bg-red-100 text-red-700 border-red-200'
-                                            : 'bg-green-100 text-green-700 border-green-200'
-                                            }`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${u.accountStatus === 'BLOCKED' ? 'bg-red-500' : 'bg-green-500'
-                                                }`}></span>
-                                            {u.accountStatus || 'ACTIVE'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${u.verificationStatus === 'APPROVED' ? 'bg-green-100 text-green-700 border-green-200' :
-                                            u.verificationStatus === 'REJECTED' ? 'bg-red-100 text-red-700 border-red-200' :
-                                                'bg-yellow-100 text-yellow-700 border-yellow-200'
-                                            }`}>
-                                            {u.verificationStatus || 'N/A'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <button
-                                                onClick={() => handleBlockUnblock(u._id, u.accountStatus)}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-sm ${u.accountStatus === 'BLOCKED'
-                                                    ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 hover:shadow'
-                                                    : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 hover:shadow'
-                                                    }`}
-                                            >
-                                                {u.accountStatus === 'BLOCKED' ? 'Unblock' : 'Block'}
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(u._id, u.Name)}
-                                                className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all border border-transparent hover:border-red-200"
-                                                title="Delete user"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/30">
-                    <span className="text-sm text-gray-500">
-                        Showing <span className="font-bold text-gray-900">{users.length}</span> of{" "}
-                        <span className="font-bold text-gray-900">{total}</span> users
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gradient-to-r from-gray-50/50 to-purple-50/30">
+                    <span className="text-sm text-gray-600">
+                        Showing <span className="font-bold text-indigo-600">{users.length}</span> of{" "}
+                        <span className="font-bold text-indigo-600">{total}</span> users
                     </span>
                     <div className="flex gap-2">
                         <button
                             disabled={page === 1}
                             onClick={() => setPage(p => p - 1)}
-                            className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="px-4 py-2 text-sm font-semibold border border-indigo-200 rounded-lg bg-white text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-md disabled:hover:shadow-none"
                         >
                             Previous
                         </button>
-                        <span className="px-3 py-1.5 text-sm font-medium text-gray-700 flex items-center">
+                        <div className="flex items-center px-4 py-2 text-sm font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg shadow-md">
                             Page {page}
-                        </span>
+                        </div>
                         <button
                             disabled={users.length < 10}
                             onClick={() => setPage(p => p + 1)}
-                            className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="px-4 py-2 text-sm font-semibold border border-indigo-200 rounded-lg bg-white text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-md disabled:hover:shadow-none"
                         >
                             Next
                         </button>

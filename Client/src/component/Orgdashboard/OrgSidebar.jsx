@@ -38,10 +38,8 @@ const OrgSidebar = () => {
         { icon: Inbox, label: 'Incoming Requests', path: '/org/incoming', visible: permissions.canViewIncoming },
         { icon: Calendar, label: 'Appointments', path: '/org/appointments', visible: permissions.canManageAppointments },
         { icon: Megaphone, label: 'Donation Camps', path: '/org/camps', visible: permissions.canCreateCamps },
-        { icon: BarChart3, label: 'Analytics', path: '/org/analytics', visible: permissions.canViewAnalytics },
         { icon: User, label: 'Profile', path: '/org/profile', visible: true },
-        { icon: Settings, label: 'Settings', path: '/org/settings', visible: true },
-        { icon: HelpCircle, label: 'Help & Support', path: '/help', visible: true },
+        { icon: Settings, label: 'Settings', path: '/org/settings', visible: true }
     ];
 
     // Filter menu items based on visibility

@@ -6,6 +6,7 @@ import CreateRequest from "./CreateRequest";
 import IncomingRequestsTab from "./IncomingRequestsTab";
 import AppointmentsTab from "./AppointmentsTab";
 import CampsTab from "./CampsTab";
+import OrgOverview from "./OrgOverview";
 
 const StatCard = ({ label, value }) => (
   <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
@@ -93,11 +94,7 @@ const OrgDashboard = () => {
       </div>
 
       <div className="mt-4">
-        {activeTab === "overview" && (
-          <div className="bg-white p-6 rounded-xl border border-gray-100 text-center text-gray-500">
-            Select a tab to manage specific operations.
-          </div>
-        )}
+        {activeTab === "overview" && <OrgOverview />}
 
         {activeTab === "inventory" && (
           <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">

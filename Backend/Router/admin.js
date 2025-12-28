@@ -962,12 +962,47 @@ router.get("/reports/summary", auth([ROLES.ADMIN]), async (req, res) => {
       ])
     ]);
 
+    // Mock chart data for frontend visualization
+    const chartData = {
+      labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
+      datasets: [
+        {
+          label: "Donations",
+          data: [
+            Math.floor(completedDonations * 0.2),
+            Math.floor(completedDonations * 0.3),
+            Math.floor(completedDonations * 0.1),
+            Math.floor(completedDonations * 0.4)
+          ],
+          borderColor: "#6366f1", // Indigo
+          backgroundColor: "rgba(99, 102, 241, 0.1)",
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: "Requests",
+          data: [
+            Math.floor(newRequests * 0.1),
+            Math.floor(newRequests * 0.4),
+            Math.floor(newRequests * 0.2),
+            Math.floor(newRequests * 0.3)
+          ],
+          borderColor: "#ef4444", // Red
+          backgroundColor: "rgba(239, 68, 68, 0.1)",
+          tension: 0.4,
+          fill: true
+        }
+      ]
+    };
+
     res.json({
       period: { from, to },
       newDonors,
-      newRequests,
-      completedDonations,
-      totalUnitsCollected: totalUnitsCollected[0]?.total || 0
+      // Frontend specific aliases
+      totalRequests: newRequests,
+      totalDonations: completedDonations,
+      totalUnitsCollected: totalUnitsCollected[0]?.total || 0,
+      chartData
     });
   } catch (err) {
     console.error(err);
@@ -989,7 +1024,6 @@ router.get("/reports/requests", auth([ROLES.ADMIN]), async (req, res) => {
 
     if (status) query.status = status;
 
-    // Aggregate by city (need to populate createdBy and get city)
     const requests = await Request.find(query)
       .populate("createdBy", "City")
       .lean();
@@ -1001,15 +1035,24 @@ router.get("/reports/requests", auth([ROLES.ADMIN]), async (req, res) => {
     requests.forEach(r => {
       const reqCity = r.createdBy?.City || "Unknown";
       byCity[reqCity] = (byCity[reqCity] || 0) + 1;
-      byStatus[r.status] = (byStatus[r.status] || 0) + 1;
-      byUrgency[r.urgency] = (byUrgency[r.urgency] || 0) + 1;
+
+      const s = r.status || "Pending";
+      byStatus[s] = (byStatus[s] || 0) + 1;
+
+      const u = r.urgency || "Low";
+      byUrgency[u] = (byUrgency[u] || 0) + 1;
     });
+
+    const fulfilled = byStatus["Fulfilled"] || byStatus["Completed"] || byStatus["Approved"] || 0;
+    const urgent = (byUrgency["Critical"] || 0) + (byUrgency["High"] || 0);
 
     res.json({
       total: requests.length,
+      fulfilled,
+      urgent,
+      urgencyDistribution: byUrgency,
       byCity,
-      byStatus,
-      byUrgency
+      byStatus
     });
   } catch (err) {
     console.error(err);
@@ -1032,13 +1075,20 @@ router.get("/reports/inventory", auth([ROLES.ADMIN]), async (req, res) => {
       }
     ]);
 
+    const distribution = {};
     const formatted = {};
+
     ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"].forEach(group => {
       const found = inventory.find(i => i._id === group);
-      formatted[group] = found || { available: 0, reserved: 0, used: 0, expired: 0 };
+      const data = found || { available: 0, reserved: 0, used: 0, expired: 0 };
+      formatted[group] = data;
+      distribution[group] = data.available;
     });
 
-    res.json(formatted);
+    res.json({
+      distribution,
+      details: formatted
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import OrgSidebar from './OrgSidebar';
 import OrgOverview from './OrgOverview';
@@ -10,6 +10,7 @@ import AppointmentsTab from './AppointmentsTab';
 import CampsTab from './CampsTab';
 import AnalyticsTab from './AnalyticsTab';
 import ProfileTab from './ProfileTab';
+import OrgSettingsPage from './OrgSettingsPage';
 import MyRequestsPage from './MyRequestsPage';
 import IncomingRequestsPage from './IncomingRequestsPage';
 import DonationPipelineTab from './DonationPipelineTab'; // Hospital pipeline
@@ -20,6 +21,7 @@ import Footer from '../Footer';
 
 const Org = () => {
     const { user } = useAuth();
+    const location = useLocation();
     const isBloodBank = user?.organizationType === 'BANK';
 
     // Choose the appropriate pipeline component based on organization type
@@ -32,21 +34,7 @@ const Org = () => {
                     <OrgSidebar />
                     <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-20 lg:ml-64 transition-all duration-300">
                         <main className="p-4 md:p-8 flex-1">
-                            {/* Header */}
-                            <header className="flex justify-between items-center mb-8">
-                                <div>
-                                    <h1 className="text-2xl font-bold text-gray-800">
-                                        {user?.organizationName || user?.Name || 'Organization Portal'}
-                                    </h1>
-                                    <p className="text-gray-500 text-sm">
-                                        {getOrgTypeLabel(user?.organizationType)} · Manage inventory and requests
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-4">
-                                    <NotificationDropdown />
-                                </div>
-                            </header>
+                            {/* Header removed as per user request to avoid duplication with page-specific headers */}
 
                             <Routes>
                                 <Route index element={<Navigate to="dashboard" replace />} />
@@ -59,10 +47,11 @@ const Org = () => {
                                 <Route path="camps" element={<CampsTab />} />
                                 <Route path="analytics" element={<AnalyticsTab />} />
                                 <Route path="profile" element={<ProfileTab />} />
+                                <Route path="settings" element={<OrgSettingsPage />} />
                                 <Route path="*" element={<Navigate to="/org/dashboard" replace />} />
                             </Routes>
                         </main>
-                        <Footer role="organization" />
+                        {!location.pathname.includes('/profile') && !location.pathname.includes('/settings') && !location.pathname.includes('/donations') && !location.pathname.includes('/appointments') && <Footer role="organization" />}
                     </div>
                 </div>
             </div>

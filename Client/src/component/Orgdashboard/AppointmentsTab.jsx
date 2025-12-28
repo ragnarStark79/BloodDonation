@@ -107,31 +107,108 @@ const AppointmentsTab = () => {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <Calendar className="text-red-600" />
-                            Appointments
-                        </h2>
-                        <p className="text-sm text-gray-500">Manage donor appointments and blood collection.</p>
-                    </div>
-                    <button
-                        onClick={fetchAppointments}
-                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition"
-                        title="Refresh"
-                    >
-                        <Clock size={20} />
-                    </button>
-                </div>
+            {/* Header Banner */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-500 rounded-2xl shadow-2xl">
+                <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-300/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
 
+                <div className="relative p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-white/20 rounded-2xl blur-sm"></div>
+                                <div className="relative w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center">
+                                    <Calendar className="text-white drop-shadow-lg" size={34} strokeWidth={2.5} />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h2 className="text-3xl font-bold text-white drop-shadow-lg mb-1">
+                                    Appointments
+                                </h2>
+                                <p className="text-indigo-100 text-sm">Manage donor appointments and blood collection</p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={fetchAppointments}
+                            disabled={loading}
+                            className="px-5 py-2.5 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl hover:bg-white/30 transition font-medium shadow-lg flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <Clock size={18} className={loading ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <Calendar className="text-blue-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-gray-800">{appointments.length}</p>
+                        <p className="text-sm text-gray-500">Upcoming Appointments</p>
+                    </div>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                        <CheckCircle className="text-green-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-gray-800">
+                            {appointments.filter(a => new Date(a.dateTime).toDateString() === new Date().toDateString()).length}
+                        </p>
+                        <p className="text-sm text-gray-500">Today's Appointments</p>
+                    </div>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <User className="text-purple-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-gray-800">
+                            {new Set(appointments.map(a => a.donorId?._id)).size}
+                        </p>
+                        <p className="text-sm text-gray-500">Unique Donors</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Appointments Table */}
+            <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
                 {loading ? (
                     <div className="text-center py-10">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                        <p className="text-gray-500 mt-3">Loading appointments...</p>
                     </div>
                 ) : appointments.length === 0 ? (
-                    <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                        No appointments found.
+                    <div className="text-center py-16">
+                        <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Calendar className="text-gray-400" size={48} />
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-2">No Appointments Scheduled</h3>
+                        <p className="text-gray-500 max-w-md mx-auto mb-6">
+                            When donors book appointments with your organization, they will appear here.
+                            You can manage check-ins and start the donation process.
+                        </p>
+                        <div className="flex items-center justify-center gap-4">
+                            <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                Upcoming
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                Completed
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg">
+                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                Cancelled
+                            </div>
+                        </div>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">

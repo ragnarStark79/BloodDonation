@@ -134,6 +134,31 @@ router.get("/dashboard", auth([ROLES.ORGANIZATION]), async (req, res) => {
 
     response.todayAppointments = todayAppointments;
 
+    // Additional Stats for Dashboard
+    const pendingAppointments = await Appointment.countDocuments({
+      organizationId: orgId,
+      status: "UPCOMING",
+      dateTime: { $gte: tomorrow } // Future appointments (after today)
+    });
+    response.stats.upcomingAppts = response.stats.upcomingAppts || pendingAppointments;
+
+    // Total donations (All time)
+    const totalDonations = await Appointment.countDocuments({
+      organizationId: orgId,
+      status: "COMPLETED",
+      donationSuccessful: true
+    });
+    response.stats.totalDonations = totalDonations;
+
+    // Fulfilled Requests (for Hospitals)
+    if (orgType === ORG_TYPES.HOSPITAL) {
+      const fulfilledRequests = await Request.countDocuments({
+        createdBy: orgId,
+        status: "FULFILLED"
+      });
+      response.stats.fulfilledRequests = fulfilledRequests;
+    }
+
     res.json(response);
   } catch (error) {
 

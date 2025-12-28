@@ -391,23 +391,82 @@ const CampsTab = () => {
                 </div>
             )}
 
+            {/* Header Banner */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-500 rounded-2xl shadow-2xl">
+                <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-300/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+
+                <div className="relative p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-white/20 rounded-2xl blur-sm"></div>
+                                <div className="relative w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center">
+                                    <Calendar className="text-white drop-shadow-lg w-9 h-9" strokeWidth={2.5} />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h2 className="text-3xl font-bold text-white drop-shadow-lg mb-1">
+                                    Donation Camps
+                                </h2>
+                                <p className="text-teal-100 text-sm">Organize and manage blood donation drives</p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                fetchCamps();
+                                fetchStats();
+                            }}
+                            disabled={loading}
+                            className="px-5 py-2.5 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl hover:bg-white/30 transition font-medium shadow-lg flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <Clock size={18} className={loading ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <p className="text-sm text-gray-500 font-medium">Total Camps</p>
-                    <p className="text-2xl font-bold text-gray-800">{stats.totalCamps}</p>
+                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+                        <Calendar className="text-gray-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-gray-800">{stats.totalCamps}</p>
+                        <p className="text-sm text-gray-500">Total Camps</p>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <p className="text-sm text-gray-500 font-medium text-blue-600">Upcoming</p>
-                    <p className="text-2xl font-bold text-gray-800">{stats.upcomingCamps}</p>
+                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <Clock className="text-blue-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-gray-800">{stats.upcomingCamps}</p>
+                        <p className="text-sm text-blue-600 font-medium">Upcoming</p>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <p className="text-sm text-gray-500 font-medium text-green-600">Completed</p>
-                    <p className="text-2xl font-bold text-gray-800">{stats.completedCamps}</p>
+                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                        <CheckCircle className="text-green-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-gray-800">{stats.completedCamps}</p>
+                        <p className="text-sm text-green-600 font-medium">Completed</p>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <p className="text-sm text-gray-500 font-medium text-red-600">Total Registrations</p>
-                    <p className="text-2xl font-bold text-gray-800">{stats.totalRegistrations}</p>
+                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                        <Users className="text-red-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-gray-800">{stats.totalRegistrations}</p>
+                        <p className="text-sm text-red-600 font-medium">Total Registrations</p>
+                    </div>
                 </div>
             </div>
 

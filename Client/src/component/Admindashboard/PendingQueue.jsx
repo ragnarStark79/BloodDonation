@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import adminApi from "../../api/adminApi";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check, X, ShieldCheck } from "lucide-react";
 import LoadingSkeleton from "../common/LoadingSkeleton";
 import ProfileUpdatesTab from "./ProfileUpdatesTab";
 
@@ -72,37 +72,46 @@ const PendingQueue = () => {
     };
 
     return (
-        <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-semibold text-gray-800">Pending Verifications</h2>
-                    <div className="flex bg-gray-100 rounded-lg p-1">
-                        <button
-                            onClick={() => setActiveTab('DONOR')}
-                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'DONOR' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            Donors
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('ORGANIZATION')}
-                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'ORGANIZATION' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            Organizations
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('PROFILE_UPDATES')}
-                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'PROFILE_UPDATES' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            Profile Updates
-                        </button>
-                    </div>
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-lg overflow-hidden">
+            {/* Header with Tabs */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100/50 p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold text-gray-800">Pending Verifications</h2>
+                    <span className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-lg shadow-md">
+                        {pendingItems.length} pending
+                    </span>
                 </div>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                    {pendingItems.length} pending
-                </span>
+
+                {/* Tab Navigation */}
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setActiveTab('DONOR')}
+                        className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'DONOR'
+                            ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
+                            : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                            }`}
+                    >
+                        Donors
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('ORGANIZATION')}
+                        className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'ORGANIZATION'
+                            ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg'
+                            : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                            }`}
+                    >
+                        Organizations
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('PROFILE_UPDATES')}
+                        className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'PROFILE_UPDATES'
+                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                            : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                            }`}
+                    >
+                        Profile Updates
+                    </button>
+                </div>
             </div>
 
             {loading && activeTab !== 'PROFILE_UPDATES' ? (
@@ -112,65 +121,80 @@ const PendingQueue = () => {
             ) : activeTab === 'PROFILE_UPDATES' ? (
                 <ProfileUpdatesTab />
             ) : (
-                <div className="overflow-x-auto min-h-[200px]">
-                    <table className="w-full text-sm">
-                        <thead className="text-left text-gray-500">
-                            <tr>
-                                <th className="py-2">Name</th>
-                                <th className="py-2">Email</th>
-                                <th className="py-2">{activeTab === 'DONOR' ? 'Blood Group' : 'Details'}</th>
-                                <th className="py-2">City</th>
-                                <th className="py-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {pendingItems.map((u) => (
-                                <tr key={u._id} className="border-t">
-                                    <td className="py-3 font-medium text-gray-800">{u.Name}</td>
-                                    <td className="py-3 text-gray-600 text-xs">{u.Email}</td>
-                                    <td className="py-3">
-                                        {activeTab === 'DONOR' ? (
-                                            <span className="px-2 py-0.5 rounded text-xs bg-red-50 text-red-700 font-medium">
-                                                {u.bloodGroup || u.Bloodgroup || 'N/A'}
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-gray-500">
-                                                {u.LicenseNumber ? `Lic: ${u.LicenseNumber}` : 'Org Account'}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="py-3 text-gray-700">{u.City}</td>
-                                    <td className="py-3 flex gap-2 justify-end">
-                                        <button
-                                            className="px-3 py-1 text-xs rounded bg-green-100 text-green-700 hover:bg-green-200 transition disabled:opacity-50 flex items-center gap-1"
-                                            onClick={() => handleApprove(u._id)}
-                                            disabled={processingId === u._id}
-                                        >
-                                            {processingId === u._id ? (
-                                                <><Loader2 size={12} className="animate-spin" /> ...</>
-                                            ) : (
-                                                'Approve'
-                                            )}
-                                        </button>
-                                        <button
-                                            className="px-3 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200 transition disabled:opacity-50"
-                                            onClick={() => handleReject(u._id)}
-                                            disabled={processingId === u._id}
-                                        >
-                                            Reject
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {pendingItems.length === 0 && (
+                <div className="p-6">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
-                                    <td className="py-12 text-center text-gray-500 text-sm" colSpan={5}>
-                                        No pending {activeTab.toLowerCase()} verifications.
-                                    </td>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Name</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Email</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">{activeTab === 'DONOR' ? 'Blood Group' : 'Details'}</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">City</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
                                 </tr>
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {pendingItems.map((u) => (
+                                    <tr key={u._id} className="hover:bg-gradient-to-r hover:from-teal-50/30 hover:to-emerald-50/30 transition-all duration-200 group">
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${activeTab === 'DONOR' ? 'from-blue-500 to-cyan-600' : 'from-orange-500 to-red-600'
+                                                    } flex items-center justify-center text-white font-bold text-sm shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all`}>
+                                                    {u.Name?.split(" ").map(n => n[0]).slice(0, 2).join("") || "U"}
+                                                </div>
+                                                <span className="font-semibold text-gray-800 group-hover:text-teal-600 transition-colors">{u.Name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-4 text-gray-600 text-xs">{u.Email}</td>
+                                        <td className="px-4 py-4">
+                                            {activeTab === 'DONOR' ? (
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                                                    {u.bloodGroup || u.Bloodgroup || 'N/A'}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-gray-500 font-medium">
+                                                    {u.LicenseNumber ? `Lic: ${u.LicenseNumber}` : 'Org Account'}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 text-gray-700 font-medium">{u.City}</td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex gap-2 justify-end">
+                                                <button
+                                                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                    onClick={() => handleApprove(u._id)}
+                                                    disabled={processingId === u._id}
+                                                >
+                                                    {processingId === u._id ? (
+                                                        <><Loader2 size={14} className="animate-spin" /> Processing...</>
+                                                    ) : (
+                                                        <><Check size={14} /> Approve</>
+                                                    )}
+                                                </button>
+                                                <button
+                                                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-red-500 to-orange-600 text-white hover:from-red-600 hover:to-orange-700 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                    onClick={() => handleReject(u._id)}
+                                                    disabled={processingId === u._id}
+                                                >
+                                                    <X size={14} /> Reject
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {pendingItems.length === 0 && (
+                                    <tr>
+                                        <td className="px-4 py-16 text-center text-gray-400 text-sm italic" colSpan={5}>
+                                            <div className="flex flex-col items-center gap-2">
+                                                <ShieldCheck className="w-12 h-12 text-gray-300" />
+                                                <p>No pending {activeTab.toLowerCase()} verifications.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
         </div>

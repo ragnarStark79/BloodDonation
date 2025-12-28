@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar'
 import { Bell, Search } from 'lucide-react';
 import client from '../../api/client';
@@ -17,6 +17,7 @@ import Footer from '../Footer';
 
 const Donor = () => {
     const [user, setUser] = useState(null);
+    const location = useLocation();
 
     const fetchProfile = async () => {
         try {
@@ -45,23 +46,14 @@ const Donor = () => {
                                     <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
                                     <p className="text-gray-500 text-sm">Overview of your donation activities</p>
                                 </div>
-                                {/*Search bar*/}
-                                <div className="flex items-center gap-4">
-                                    <div className="hidden sm:flex items-center bg-white px-3 py-2 rounded-lg border border-gray-200 focus-within:border-red-300 focus-within:ring-2 focus-within:ring-red-100 transition-all">
-                                        <Search size={18} className="text-gray-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search..."
-                                            className="ml-2 outline-none text-sm bg-transparent w-48"
+                                {/*profile - Gender based avatar*/}
+                                <div className="w-10 h-10 rounded-full bg-linear-to-tr from-red-500 to-orange-400 p-0.5 cursor-pointer">
+                                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                        <img
+                                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.Gender === 'Female' ? 'Sarah' : 'Alex'}&backgroundColor=transparent`}
+                                            alt="Profile"
+                                            className="w-full h-full"
                                         />
-                                    </div>
-                                    {/*Notification icon */}
-                                    <NotificationDropdown />
-                                    {/*profile*/}
-                                    <div className="w-10 h-10 rounded-full bg-linear-to-tr from-red-500 to-orange-400 p-0.5 cursor-pointer">
-                                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Profile" className="w-full h-full" />
-                                        </div>
                                     </div>
                                 </div>
                             </header>
@@ -79,7 +71,7 @@ const Donor = () => {
                                 <Route path="*" element={<Navigate to="/donor/dashboard" replace />} />
                             </Routes>
                         </main>
-                        <Footer role="donor" />
+                        {!location.pathname.includes('/camps') && !location.pathname.includes('/profile') && !location.pathname.includes('/appointments') && !location.pathname.includes('/settings') && <Footer role="donor" />}
                     </div>
                 </div>
             </div>

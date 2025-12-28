@@ -126,134 +126,150 @@ const IncomingRequestsPage = () => {
     const activeFiltersCount = [filters.bloodGroup, filters.urgency].filter(Boolean).length;
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                            <Package className="w-8 h-8 text-purple-600" />
-                            Incoming Blood Requests
-                        </h1>
-                        <p className="text-gray-600 mt-1">Requests from hospitals that you can fulfill from your inventory</p>
-                    </div>
-                    <button
-                        onClick={() => fetchRequests(true)}
-                        disabled={refreshing}
-                        className="p-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                        <RefreshCw className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
-                    </button>
-                </div>
+        <div className="space-y-6 animate-fade-in">
+            {/* Header Banner */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-500 rounded-2xl shadow-2xl">
+                <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-300/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
 
-                {/* Search and Filter */}
-                <div className="flex gap-3">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search by hospital, location, blood group, or case details..."
-                            value={filters.search}
-                            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                            className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                    </div>
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={`px-4 py-3 border rounded-lg flex items-center gap-2 transition-colors ${showFilters || activeFiltersCount > 0
-                            ? 'bg-purple-50 border-purple-300 text-purple-700'
-                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                            }`}
-                    >
-                        <Filter className="w-5 h-5" />
-                        Filters
-                        {activeFiltersCount > 0 && (
-                            <span className="ml-1 px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
-                                {activeFiltersCount}
-                            </span>
-                        )}
-                    </button>
-                </div>
+                <div className="relative p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-white/20 rounded-2xl blur-sm"></div>
+                                <div className="relative w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center">
+                                    <Package className="text-white drop-shadow-lg w-9 h-9" strokeWidth={2.5} />
+                                </div>
+                            </div>
 
-                {/* Filter Panel */}
-                {showFilters && (
-                    <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Blood Group</label>
-                                <select
-                                    value={filters.bloodGroup}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, bloodGroup: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                >
-                                    <option value="">All Blood Groups</option>
-                                    {BLOOD_GROUPS.map(group => (
-                                        <option key={group} value={group}>{group}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Urgency</label>
-                                <select
-                                    value={filters.urgency}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, urgency: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                >
-                                    <option value="">All Urgency Levels</option>
-                                    {Object.values(REQUEST_URGENCY).map(urgency => (
-                                        <option key={urgency} value={urgency}>{urgency}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex items-end">
-                                <button
-                                    onClick={() => setFilters({ bloodGroup: '', urgency: '', search: '' })}
-                                    className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                                >
-                                    Clear Filters
-                                </button>
+                                <h1 className="text-3xl font-bold text-white drop-shadow-lg mb-1">
+                                    Incoming Blood Requests
+                                </h1>
+                                <p className="text-purple-100 text-sm">Requests from hospitals that you can fulfill from your inventory</p>
                             </div>
                         </div>
+
+                        <button
+                            onClick={() => fetchRequests(true)}
+                            disabled={refreshing}
+                            className="px-5 py-2.5 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl hover:bg-white/30 transition font-medium shadow-lg flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
                     </div>
-                )}
+                </div>
             </div>
 
+            {/* Search and Filter */}
+            <div className="flex gap-3">
+                <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search by hospital, location, blood group, or case details..."
+                        value={filters.search}
+                        onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                    />
+                </div>
+                <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`px-4 py-3 border rounded-lg flex items-center gap-2 transition-colors ${showFilters || activeFiltersCount > 0
+                        ? 'bg-purple-50 border-purple-300 text-purple-700'
+                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                >
+                    <Filter className="w-5 h-5" />
+                    Filters
+                    {activeFiltersCount > 0 && (
+                        <span className="ml-1 px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
+                            {activeFiltersCount}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {/* Filter Panel */}
+            {showFilters && (
+                <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Blood Group</label>
+                            <select
+                                value={filters.bloodGroup}
+                                onChange={(e) => setFilters(prev => ({ ...prev, bloodGroup: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                            >
+                                <option value="">All Blood Groups</option>
+                                {BLOOD_GROUPS.map(group => (
+                                    <option key={group} value={group}>{group}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Urgency</label>
+                            <select
+                                value={filters.urgency}
+                                onChange={(e) => setFilters(prev => ({ ...prev, urgency: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                            >
+                                <option value="">All Urgency Levels</option>
+                                {Object.values(REQUEST_URGENCY).map(urgency => (
+                                    <option key={urgency} value={urgency}>{urgency}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                onClick={() => setFilters({ bloodGroup: '', urgency: '', search: '' })}
+                                className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-600">Total Requests</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
-                        </div>
-                        <Package className="w-10 h-10 text-blue-600 opacity-20" />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <Package className="text-blue-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                        <p className="text-sm text-gray-500">Total Requests</p>
                     </div>
                 </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-600">Can Fulfill</p>
-                            <p className="text-2xl font-bold text-green-600 mt-1">{stats.canFulfill}</p>
-                        </div>
-                        <CheckCircle className="w-10 h-10 text-green-600 opacity-20" />
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                        <CheckCircle className="text-green-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-green-600">{stats.canFulfill}</p>
+                        <p className="text-sm text-gray-500">Can Fulfill</p>
                     </div>
                 </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-600">Critical</p>
-                            <p className="text-2xl font-bold text-red-600 mt-1">{stats.critical}</p>
-                        </div>
-                        <AlertCircle className="w-10 h-10 text-red-600 opacity-20" />
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                        <AlertCircle className="text-red-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-red-600">{stats.critical}</p>
+                        <p className="text-sm text-gray-500">Critical</p>
                     </div>
                 </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-600">Active</p>
-                            <p className="text-2xl font-bold text-purple-600 mt-1">{stats.active}</p>
-                        </div>
-                        <Clock className="w-10 h-10 text-purple-600 opacity-20" />
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <Clock className="text-purple-600" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-bold text-purple-600">{stats.active}</p>
+                        <p className="text-sm text-gray-500">Active</p>
                     </div>
                 </div>
             </div>

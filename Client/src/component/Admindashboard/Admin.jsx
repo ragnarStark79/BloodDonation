@@ -18,6 +18,7 @@ const Admin = () => {
         <Route path="appointments" element={<AdminDashboard />} />
         <Route path="requests" element={<RequestsMonitorPage />} />
         <Route path="stock" element={<AdminDashboard />} />
+        <Route path="reports" element={<AdminDashboard />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>

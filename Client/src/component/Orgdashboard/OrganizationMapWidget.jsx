@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleMap, useLoadScript, Marker, InfoWindow } from '@react-google-maps/api';
-import { Loader2, MapPin, AlertCircle, Building2, Hospital } from 'lucide-react';
+import { Loader2, MapPin, AlertCircle, Building2, Hospital, RefreshCw } from 'lucide-react';
 import client from '../../api/client';
 
 const containerStyle = {
@@ -55,6 +55,28 @@ const OrganizationMapWidget = () => {
         };
         loadOrganizations();
     }, []);
+
+    // Refresh organizations function
+    const refreshMap = async () => {
+        try {
+            setLoading(true);
+            const res = await client.get("/api/admin/users", {
+                params: { limit: 1000, role: 'ORGANIZATION' }
+            });
+
+            const orgUsers = res.data.users || res.data || [];
+            const validOrgs = orgUsers.filter(org =>
+                org.locationGeo?.coordinates &&
+                org.locationGeo.coordinates.length === 2 &&
+                (org.organizationType === 'HOSPITAL' || org.organizationType === 'BANK')
+            );
+            setOrganizations(validOrgs);
+        } catch (err) {
+            console.error("Failed to refresh organizations:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleMarkerClick = (org) => {
         setSelectedOrg(org);
@@ -121,6 +143,14 @@ const OrganizationMapWidget = () => {
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-800">Network Map</h3>
                 <div className="flex items-center gap-4 text-sm">
+                    <button
+                        onClick={refreshMap}
+                        disabled={loading}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition text-xs font-medium disabled:opacity-50"
+                    >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        Refresh
+                    </button>
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-red-600 rounded-full"></div>
                         <span className="text-gray-600">Hospitals ({hospitals.length})</span>
@@ -252,8 +282,8 @@ const OrganizationMapWidget = () => {
                                         {selectedOrg.verificationStatus && (
                                             <p>
                                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${selectedOrg.verificationStatus === 'VERIFIED'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-yellow-100 text-yellow-700'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-yellow-100 text-yellow-700'
                                                     }`}>
                                                     {selectedOrg.verificationStatus}
                                                 </span>

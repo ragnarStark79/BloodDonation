@@ -7,7 +7,6 @@ import {
     Package,
     BarChart3,
     UserCircle,
-    Settings,
     Menu,
     X,
     Droplet
@@ -29,7 +28,6 @@ const AdminSidebar = () => {
         { icon: Package, label: 'Stock', path: '/admin/stock' },
         { icon: BarChart3, label: 'Reports & Logs', path: '/admin/reports' },
         { icon: UserCircle, label: 'Profile', path: '/admin/profile' },
-        { icon: Settings, label: 'Settings', path: '/admin/settings' },
     ];
 
     const handleNavigation = (path) => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import orgApi from '../../api/orgApi';
 import { useAuth } from '../../context/AuthContext';
-import { Package, AlertTriangle, Calendar, FileText, Inbox, TrendingUp, Clock, RefreshCw } from 'lucide-react';
+import { Package, AlertTriangle, Calendar, FileText, Inbox, TrendingUp, Clock, RefreshCw, Users, CheckCircle } from 'lucide-react';
 import { getOrgPermissions, getOrgTypeLabel, getOrgTypeBadgeColor } from './orgUtils';
 
 import DonationTrendsChart from './DonationTrendsChart';
@@ -271,12 +271,6 @@ const OrgOverview = () => {
                             color="blue"
                             onClick={() => navigate('/org/inventory')}
                         />
-                        <StatCard
-                            icon={AlertTriangle}
-                            label="Expiring Soon"
-                            value={stats?.expiringSoon}
-                            color="orange"
-                        />
                     </>
                 )}
 
@@ -307,6 +301,23 @@ const OrgOverview = () => {
                         onClick={() => navigate('/org/incoming')}
                     />
                 )}
+
+                {/* Additional Stats to fill grid */}
+                {permissions.canCreateRequests && (
+                    <StatCard
+                        icon={CheckCircle}
+                        label="Fulfilled Requests"
+                        value={stats?.fulfilledRequests || 0}
+                        color="blue"
+                    />
+                )}
+
+                <StatCard
+                    icon={Users}
+                    label="Total Donations"
+                    value={stats?.totalDonations || 0}
+                    color="orange"
+                />
             </div>
 
             {/* Charts Section */}

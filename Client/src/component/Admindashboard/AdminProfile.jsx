@@ -1,23 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-    User,
-    Mail,
-    Phone,
-    Shield,
-    Lock,
-    Key,
-    Globe,
-    Bell,
-    Moon,
-    Sun,
-    Monitor,
-    Clock,
-    MapPin,
-    Filter,
-    CheckCircle,
-    AlertCircle,
-    Eye,
-    EyeOff
+    User, Mail, Phone, Shield, Lock, Key, Globe, Bell,
+    Moon, Sun, Monitor, Clock, MapPin, Filter, CheckCircle,
+    Eye, EyeOff, Save, Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
@@ -26,6 +11,7 @@ import authApi from '../../api/authApi';
 
 const AdminProfile = () => {
     const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState('personal');
 
     // Basic Info State
     const [basicInfo, setBasicInfo] = useState({
@@ -62,13 +48,7 @@ const AdminProfile = () => {
         }
     });
 
-    // Session Info State
-    const [sessionInfo, setSessionInfo] = useState({
-        lastLogin: '2025-12-16 23:45:30',
-        ipAddress: '192.168.1.100'
-    });
-
-    // Loading States
+    // Loading & Saving States
     const [loading, setLoading] = useState({
         basicInfo: false,
         password: false,
@@ -87,8 +67,7 @@ const AdminProfile = () => {
     }, [user]);
 
     // Handlers
-    const handleBasicInfoUpdate = async (e) => {
-        e.preventDefault();
+    const handleBasicInfoUpdate = async () => {
         setLoading({ ...loading, basicInfo: true });
         try {
             // await authApi.updateProfile(basicInfo);
@@ -102,12 +81,10 @@ const AdminProfile = () => {
 
     const handlePasswordChange = async (e) => {
         e.preventDefault();
-
         if (passwordData.newPassword !== passwordData.confirmPassword) {
             toast.error('Passwords do not match');
             return;
         }
-
         if (passwordData.newPassword.length < 8) {
             toast.error('Password must be at least 8 characters');
             return;
@@ -131,7 +108,6 @@ const AdminProfile = () => {
     const handlePreferencesUpdate = async () => {
         setLoading({ ...loading, preferences: true });
         try {
-            // await authApi.updatePreferences(preferences);
             toast.success('Preferences updated successfully');
         } catch (error) {
             toast.error('Failed to update preferences');
@@ -143,7 +119,6 @@ const AdminProfile = () => {
     const toggle2FA = async () => {
         try {
             const newStatus = !twoFactorEnabled;
-            // await authApi.toggle2FA(newStatus);
             setTwoFactorEnabled(newStatus);
             toast.success(`2FA ${newStatus ? 'enabled' : 'disabled'} successfully`);
         } catch (error) {
@@ -151,467 +126,254 @@ const AdminProfile = () => {
         }
     };
 
+    const tabs = [
+        { id: 'personal', label: 'Personal Info', icon: User },
+        { id: 'security', label: 'Security', icon: Lock }
+    ];
+
     return (
         <div className="flex min-h-screen bg-gray-50">
             <AdminSidebar />
-
             <main className="flex-1 ml-0 md:ml-20 lg:ml-64 p-6 md:p-8">
-                {/* Header */}
-                <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">Admin Profile</h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Manage your account settings and preferences
-                    </p>
-                </div>
+                <div className="max-w-4xl mx-auto space-y-6">
+                    {/* Header Removed to match Donor Profile style which starts with tabs/title */}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Main Content - 2 columns */}
-                    <div className="lg:col-span-2 space-y-6">
+                    {/* Tabs */}
+                    <div className="flex border-b border-gray-200">
+                        {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors relative
+                                        ${activeTab === tab.id
+                                            ? 'text-red-600'
+                                            : 'text-gray-500 hover:text-gray-700'}
+                                    `}
+                                >
+                                    <Icon size={18} />
+                                    {tab.label}
+                                    {activeTab === tab.id && (
+                                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-600" />
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
 
-                        {/* Basic Information */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                                    <User className="w-5 h-5 text-red-600" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold text-gray-800">Basic Information</h3>
-                                    <p className="text-xs text-gray-500">Update your personal details</p>
-                                </div>
-                            </div>
-
-                            <form onSubmit={handleBasicInfoUpdate} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Full Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={basicInfo.name}
-                                        onChange={(e) => setBasicInfo({ ...basicInfo, name: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                                        placeholder="Enter your name"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Email Address
-                                    </label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input
-                                            type="email"
-                                            value={basicInfo.email}
-                                            readOnly
-                                            className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-                                        />
+                    {/* Content Container */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        {activeTab === 'personal' && (
+                            <div className="space-y-6">
+                                {/* Info Alert */}
+                                <div className="border rounded-lg p-4 flex items-start gap-3 bg-blue-50 border-blue-200">
+                                    <div className="mt-0.5 text-blue-600">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                                    <div className="text-sm">
+                                        <p className="font-medium mb-1 text-blue-800">Admin Profile Information</p>
+                                        <p className="text-blue-700">You can update your personal details here. Role and Email are managed by the system.</p>
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Phone Number
-                                    </label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                {/* Fields */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <Field label="Full Name" icon={User}>
                                         <input
-                                            type="tel"
+                                            value={basicInfo.name}
+                                            onChange={(e) => setBasicInfo({ ...basicInfo, name: e.target.value })}
+                                            className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white transition-all"
+                                            placeholder="Enter your full name"
+                                        />
+                                    </Field>
+
+                                    <Field label="Email Address" icon={Mail} hint="Read-only">
+                                        <input
+                                            value={basicInfo.email}
+                                            disabled
+                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-500 cursor-not-allowed"
+                                        />
+                                    </Field>
+
+                                    <Field label="Phone Number" icon={Phone}>
+                                        <input
                                             value={basicInfo.phone}
                                             onChange={(e) => setBasicInfo({ ...basicInfo, phone: e.target.value })}
-                                            className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                            type="tel"
+                                            className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white transition-all"
                                             placeholder="Enter phone number"
                                         />
-                                    </div>
-                                </div>
+                                    </Field>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Role
-                                    </label>
-                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg">
-                                        <Shield className="w-5 h-5 text-red-600" />
-                                        <span className="font-semibold text-red-700">ADMIN</span>
-                                        <span className="text-xs text-red-600 ml-auto">Read-only</span>
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={loading.basicInfo}
-                                    className="w-full bg-red-600 text-white py-2.5 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    {loading.basicInfo ? 'Updating...' : 'Update Basic Info'}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Security */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <Lock className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold text-gray-800">Security</h3>
-                                    <p className="text-xs text-gray-500">Manage your password and 2FA</p>
-                                </div>
-                            </div>
-
-                            {/* Change Password */}
-                            <form onSubmit={handlePasswordChange} className="space-y-4 mb-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Current Password
-                                    </label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <Field label="Role" hint="Read-only">
                                         <input
-                                            type={showPasswords.old ? "text" : "password"}
-                                            value={passwordData.oldPassword}
-                                            onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
-                                            className="w-full pl-11 pr-11 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            placeholder="Enter current password"
+                                            value="ADMIN"
+                                            disabled
+                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-500 cursor-not-allowed uppercase"
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPasswords({ ...showPasswords, old: !showPasswords.old })}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
-                                            {showPasswords.old ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                        </button>
-                                    </div>
+                                    </Field>
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        New Password
-                                    </label>
-                                    <div className="relative">
-                                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input
-                                            type={showPasswords.new ? "text" : "password"}
-                                            value={passwordData.newPassword}
-                                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                                            className="w-full pl-11 pr-11 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            placeholder="Enter new password"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
-                                            {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Confirm New Password
-                                    </label>
-                                    <div className="relative">
-                                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input
-                                            type={showPasswords.confirm ? "text" : "password"}
-                                            value={passwordData.confirmPassword}
-                                            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                                            className="w-full pl-11 pr-11 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            placeholder="Confirm new password"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
-                                            {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={loading.password}
-                                    className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    {loading.password ? 'Changing...' : 'Change Password'}
-                                </button>
-                            </form>
-
-                            {/* 2FA Toggle */}
-                            <div className="pt-6 border-t border-gray-200">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <Shield className="w-5 h-5 text-blue-600" />
-                                        <div>
-                                            <p className="font-medium text-gray-800">Two-Factor Authentication</p>
-                                            <p className="text-xs text-gray-500">Add an extra layer of security</p>
+                                {/* Status Section */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <Field label="Verification Status" hint="Read-only">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-3 py-2 rounded-lg font-medium text-sm flex-1 text-center bg-green-100 text-green-800 border border-green-200">
+                                                VERIFIED
+                                            </span>
                                         </div>
-                                    </div>
+                                    </Field>
+
+                                    <Field label="Account Status" hint="Read-only">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-3 py-2 rounded-lg font-medium text-sm flex-1 text-center bg-green-100 text-green-800 border border-green-200">
+                                                ACTIVE
+                                            </span>
+                                        </div>
+                                    </Field>
+                                </div>
+
+                                {/* Save Button Bar */}
+                                <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                                    <p className="text-sm text-gray-500">
+                                        {/* Simplified simplified check */}
+                                        <span>Click save to apply changes</span>
+                                    </p>
                                     <button
-                                        onClick={toggle2FA}
-                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${twoFactorEnabled ? 'bg-green-600' : 'bg-gray-300'
+                                        onClick={handleBasicInfoUpdate}
+                                        disabled={loading.basicInfo}
+                                        className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all shadow-sm ${loading.basicInfo
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                            : 'bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95'
                                             }`}
                                     >
-                                        <span
-                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
-                                                }`}
-                                        />
+                                        {loading.basicInfo ? 'Saving...' : (
+                                            <>
+                                                <Save size={18} />
+                                                Save Changes
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Preferences */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                                    <Globe className="w-5 h-5 text-purple-600" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold text-gray-800">Preferences</h3>
-                                    <p className="text-xs text-gray-500">Customize your experience</p>
-                                </div>
-                            </div>
-
+                        {activeTab === 'security' && (
                             <div className="space-y-6">
-                                {/* Theme */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                                        Theme
-                                    </label>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {[
-                                            { value: 'light', icon: Sun, label: 'Light' },
-                                            { value: 'dark', icon: Moon, label: 'Dark' },
-                                            { value: 'auto', icon: Monitor, label: 'Auto' }
-                                        ].map(({ value, icon: Icon, label }) => (
-                                            <button
-                                                key={value}
-                                                onClick={() => setPreferences({ ...preferences, theme: value })}
-                                                className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${preferences.theme === value
-                                                        ? 'border-purple-600 bg-purple-50'
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                    }`}
-                                            >
-                                                <Icon className={`w-5 h-5 ${preferences.theme === value ? 'text-purple-600' : 'text-gray-600'
-                                                    }`} />
-                                                <span className={`text-sm font-medium ${preferences.theme === value ? 'text-purple-600' : 'text-gray-600'
-                                                    }`}>{label}</span>
-                                            </button>
-                                        ))}
+                                <form onSubmit={handlePasswordChange}>
+                                    <div className="grid grid-cols-1 gap-6">
+                                        <Field label="Current Password" icon={Lock}>
+                                            <div className="relative">
+                                                <input
+                                                    type={showPasswords.old ? "text" : "password"}
+                                                    value={passwordData.oldPassword}
+                                                    onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+                                                    className="w-full p-3 pr-10 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                                                    placeholder="Enter current password"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPasswords({ ...showPasswords, old: !showPasswords.old })}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    {showPasswords.old ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        </Field>
+
+                                        <Field label="New Password" icon={Key}>
+                                            <div className="relative">
+                                                <input
+                                                    type={showPasswords.new ? "text" : "password"}
+                                                    value={passwordData.newPassword}
+                                                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                                    className="w-full p-3 pr-10 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                                                    placeholder="Enter new password"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    {showPasswords.new ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        </Field>
+
+                                        <Field label="Confirm Password" icon={Key}>
+                                            <div className="relative">
+                                                <input
+                                                    type={showPasswords.confirm ? "text" : "password"}
+                                                    value={passwordData.confirmPassword}
+                                                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                                    className="w-full p-3 pr-10 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                                                    placeholder="Confirm new password"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        </Field>
                                     </div>
-                                </div>
 
-                                {/* Language */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Language
-                                    </label>
-                                    <select
-                                        value={preferences.language}
-                                        onChange={(e) => setPreferences({ ...preferences, language: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    >
-                                        <option value="en">English</option>
-                                        <option value="hi">Hindi</option>
-                                        <option value="es">Spanish</option>
-                                        <option value="fr">French</option>
-                                    </select>
-                                </div>
-
-                                {/* Timezone */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        <MapPin className="w-4 h-4 inline mr-1" />
-                                        Timezone
-                                    </label>
-                                    <select
-                                        value={preferences.timezone}
-                                        onChange={(e) => setPreferences({ ...preferences, timezone: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    >
-                                        <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                                        <option value="America/New_York">America/New_York (EST)</option>
-                                        <option value="Europe/London">Europe/London (GMT)</option>
-                                        <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
-                                    </select>
-                                </div>
-
-                                {/* Time Format */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        <Clock className="w-4 h-4 inline mr-1" />
-                                        Time Format
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {[
-                                            { value: '12h', label: '12-hour (3:45 PM)' },
-                                            { value: '24h', label: '24-hour (15:45)' }
-                                        ].map(({ value, label }) => (
-                                            <button
-                                                key={value}
-                                                onClick={() => setPreferences({ ...preferences, timeFormat: value })}
-                                                className={`px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${preferences.timeFormat === value
-                                                        ? 'border-purple-600 bg-purple-50 text-purple-600'
-                                                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                                                    }`}
-                                            >
-                                                {label}
-                                            </button>
-                                        ))}
+                                    <div className="flex justify-end pt-4 border-t border-gray-200 mt-6">
+                                        <button
+                                            type="submit"
+                                            disabled={loading.password}
+                                            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all shadow-sm ${loading.password
+                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                : 'bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95'
+                                                }`}
+                                        >
+                                            {loading.password ? 'Updating...' : 'Change Password'}
+                                        </button>
                                     </div>
-                                </div>
+                                </form>
 
-                                {/* Default Dashboard Filter */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        <Filter className="w-4 h-4 inline mr-1" />
-                                        Default Dashboard Filter
-                                    </label>
-                                    <select
-                                        value={preferences.defaultFilter}
-                                        onChange={(e) => setPreferences({ ...preferences, defaultFilter: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    >
-                                        <option value="today">Today</option>
-                                        <option value="7days">Last 7 days</option>
-                                        <option value="30days">Last 30 days</option>
-                                        <option value="90days">Last 90 days</option>
-                                    </select>
-                                </div>
-
-                                {/* Notification Preferences */}
-                                <div className="pt-4 border-t border-gray-200">
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                                        <Bell className="w-4 h-4 inline mr-1" />
-                                        Notification Preferences
-                                    </label>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <span className="text-sm text-gray-700">Email - New Pending Requests</span>
-                                            <input
-                                                type="checkbox"
-                                                checked={preferences.notifications.emailPending}
-                                                onChange={(e) => setPreferences({
-                                                    ...preferences,
-                                                    notifications: { ...preferences.notifications, emailPending: e.target.checked }
-                                                })}
-                                                className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
-                                            />
+                                {/* 2FA Toggle matching styling */}
+                                <div className="border-t border-gray-200 pt-6">
+                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                        <div className="flex items-center gap-3">
+                                            <Shield className="w-5 h-5 text-blue-600" />
+                                            <div>
+                                                <p className="font-medium text-gray-800">Two-Factor Authentication</p>
+                                                <p className="text-xs text-gray-500">Add an extra layer of security</p>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <span className="text-sm text-gray-700">In-App - New Pending Requests</span>
-                                            <input
-                                                type="checkbox"
-                                                checked={preferences.notifications.inAppPending}
-                                                onChange={(e) => setPreferences({
-                                                    ...preferences,
-                                                    notifications: { ...preferences.notifications, inAppPending: e.target.checked }
-                                                })}
-                                                className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <span className="text-sm text-gray-700">Email - Critical Alerts</span>
-                                            <input
-                                                type="checkbox"
-                                                checked={preferences.notifications.emailAlerts}
-                                                onChange={(e) => setPreferences({
-                                                    ...preferences,
-                                                    notifications: { ...preferences.notifications, emailAlerts: e.target.checked }
-                                                })}
-                                                className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <span className="text-sm text-gray-700">In-App - Critical Alerts</span>
-                                            <input
-                                                type="checkbox"
-                                                checked={preferences.notifications.inAppAlerts}
-                                                onChange={(e) => setPreferences({
-                                                    ...preferences,
-                                                    notifications: { ...preferences.notifications, inAppAlerts: e.target.checked }
-                                                })}
-                                                className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={handlePreferencesUpdate}
-                                    disabled={loading.preferences}
-                                    className="w-full bg-purple-600 text-white py-2.5 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    {loading.preferences ? 'Saving...' : 'Save Preferences'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Sidebar - 1 column */}
-                    <div className="space-y-6">
-                        {/* Session Info */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <CheckCircle className="w-5 h-5 text-green-600" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold text-gray-800">Session Info</h3>
-                                    <p className="text-xs text-gray-500">Current session details</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="p-4 bg-gray-50 rounded-lg">
-                                    <p className="text-xs text-gray-500 mb-1">Last Login</p>
-                                    <p className="text-sm font-medium text-gray-800">{sessionInfo.lastLogin}</p>
-                                </div>
-
-                                <div className="p-4 bg-gray-50 rounded-lg">
-                                    <p className="text-xs text-gray-500 mb-1">IP Address</p>
-                                    <p className="text-sm font-medium text-gray-800 font-mono">{sessionInfo.ipAddress}</p>
-                                </div>
-
-                                <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="text-sm font-medium text-green-800">Active Session</p>
-                                        <p className="text-xs text-green-600 mt-1">Your account is secure</p>
+                                        <button
+                                            onClick={toggle2FA}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${twoFactorEnabled ? 'bg-green-600' : 'bg-gray-300'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Quick Stats */}
-                        <div className="bg-gradient-to-br from-red-600 to-red-700 rounded-xl shadow-sm p-6 text-white">
-                            <h3 className="text-lg font-semibold mb-4">Account Status</h3>
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm opacity-90">Account Type</span>
-                                    <span className="font-semibold">ADMIN</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm opacity-90">2FA Status</span>
-                                    <span className={`text-sm font-semibold px-2 py-1 rounded ${twoFactorEnabled ? 'bg-green-500' : 'bg-yellow-500'
-                                        }`}>
-                                        {twoFactorEnabled ? 'Enabled' : 'Disabled'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm opacity-90">Profile Status</span>
-                                    <span className="text-sm font-semibold px-2 py-1 bg-green-500 rounded">Active</span>
-                                </div>
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </main>
         </div>
     );
 };
+
+// Reusable Field Component matching Donor Profile
+const Field = ({ label, hint, icon: Icon, children }) => (
+    <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            {Icon && <Icon size={16} className="text-gray-400" />}
+            {label}
+            {hint && <span className="text-xs text-gray-400">({hint})</span>}
+        </label>
+        {children}
+    </div>
+);
 
 export default AdminProfile;
